@@ -2532,6 +2532,20 @@ function SubmissionWorkspaceView({ navigate, activeUserId }) {
 
   const activeItem = submissionItems.find(i => i.event_id === selectedEventId) || submissionItems[0];
 
+  // Dynamic real-time submission completion calculation based on competition requirements
+  const calculateLiveCompletion = () => {
+    if (activeItem?.status === 'FINAL') return 100;
+    let pct = 0;
+    if (title.trim()) pct += 20;
+    if (problemStatement.trim()) pct += 20;
+    if (solutionSummary.trim()) pct += 20;
+    if (repoUrl.trim()) pct += 20;
+    if (demoUrl.trim()) pct += 20;
+    return pct;
+  };
+
+  const livePct = calculateLiveCompletion();
+
   const handleSelectEvent = (eventId) => {
     setSelectedEventId(eventId);
     loadPerEventSubmission(eventId);
@@ -2642,11 +2656,33 @@ function SubmissionWorkspaceView({ navigate, activeUserId }) {
             </div>
             
             <div class="text-right space-y-1">
-              <span class={`px-3 py-1 font-extrabold text-xs rounded-full inline-block ${
-                activeItem.status === 'FINAL' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'
+              <span class={`px-3.5 py-1.5 font-extrabold text-xs rounded-full inline-flex items-center space-x-1.5 border ${
+                activeItem.status === 'FINAL' || livePct === 100
+                  ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                  : livePct > 0
+                  ? 'bg-amber-100 text-amber-800 border-amber-300'
+                  : 'bg-slate-100 text-slate-700 border-slate-300'
               }`}>
-                {activeItem.status === 'FINAL' ? 'FINAL SUBMITTED ✓' : `${activeItem.completion_pct}% Complete`}
+                <span>{activeItem.status === 'FINAL' ? 'FINAL SUBMITTED ✓' : `${livePct}% Complete`}</span>
               </span>
+            </div>
+          </div>
+
+          {/* Dynamic Real-Time Competition Progress Bar */}
+          <div class="space-y-1.5">
+            <div class="flex justify-between text-xs font-bold text-slate-600">
+              <span>Submission Readiness Score</span>
+              <span class={livePct === 100 ? 'text-emerald-600' : 'text-blue-600'}>{livePct}% Complete</span>
+            </div>
+            <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden border border-slate-200">
+              <div
+                class={`h-full transition-all duration-500 rounded-full ${
+                  livePct === 100
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500'
+                    : 'bg-gradient-to-r from-blue-500 to-indigo-600'
+                }`}
+                style={{ width: `${livePct}%` }}
+              ></div>
             </div>
           </div>
 
