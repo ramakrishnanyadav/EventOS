@@ -2363,11 +2363,11 @@ function DeveloperProfileView({ navigate }) {
       <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-2xs space-y-3">
         <h2 class="font-display font-bold text-lg text-slate-900">Canonical Skill Taxonomy</h2>
         <div class="flex flex-wrap gap-2">
-          {profileData.skills?.map(s => (
-            <span key={s.canonical_id} class="px-3 py-1.5 bg-blue-50 text-blue-800 border border-blue-200 font-bold text-xs rounded-xl">
-              #{s.display_name}
+          {activeProfile?.skills?.map(s => (
+            <span key={s.canonical_id || s.display_name} class="px-3 py-1.5 bg-blue-50 text-blue-800 border border-blue-200 font-bold text-xs rounded-xl">
+              #{s.display_name || s}
             </span>
-          ))}
+          )) || <span class="text-xs text-slate-400">React • TypeScript • Node.js • AI/ML</span>}
         </div>
       </div>
 
@@ -2383,7 +2383,7 @@ function DeveloperProfileView({ navigate }) {
           </div>
 
           <div class="space-y-3">
-            {profileData.achievements?.verified?.map(ach => (
+            {activeProfile?.achievements?.verified?.map(ach => (
               <div key={ach.id} class="bg-emerald-50/60 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between badge-verified-glow">
                 <div class="space-y-1">
                   <div class="flex items-center space-x-2">
@@ -2394,7 +2394,11 @@ function DeveloperProfileView({ navigate }) {
                   <span class="text-[11px] text-emerald-700 font-bold block">Verified by {ach.verifier_name}</span>
                 </div>
               </div>
-            ))}
+            )) || (
+              <div class="p-4 bg-slate-50 text-slate-400 text-xs font-medium rounded-2xl">
+                No verified achievements yet. Participate in hackathons to earn verified credentials!
+              </div>
+            )}
           </div>
         </div>
 
@@ -2406,7 +2410,7 @@ function DeveloperProfileView({ navigate }) {
           </div>
 
           <div class="space-y-3">
-            {profileData.achievements?.self_reported?.map(ach => (
+            {activeProfile?.achievements?.self_reported?.map(ach => (
               <div key={ach.id} class="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between opacity-80">
                 <div class="space-y-1">
                   <div class="flex items-center space-x-2">
@@ -2416,7 +2420,11 @@ function DeveloperProfileView({ navigate }) {
                   <p class="text-xs text-slate-600 font-medium">{ach.description}</p>
                 </div>
               </div>
-            ))}
+            )) || (
+              <div class="p-4 bg-slate-50 text-slate-400 text-xs font-medium rounded-2xl">
+                No self-reported claims added.
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -2425,13 +2433,18 @@ function DeveloperProfileView({ navigate }) {
       <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-2xs space-y-4">
         <h2 class="font-display font-bold text-lg text-slate-900">Education History</h2>
         <div class="space-y-3">
-          {profileData.education?.map(edu => (
+          {activeProfile?.education?.map(edu => (
             <div key={edu.id} class="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-1">
               <h3 class="font-bold text-slate-900 text-sm">{edu.degree} — {edu.field}</h3>
               <p class="text-xs font-semibold text-blue-600">{edu.institution}</p>
               <p class="text-xs text-slate-500">{edu.start_date} – {edu.end_date || 'Present'}</p>
             </div>
-          ))}
+          )) || (
+            <div class="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-1">
+              <h3 class="font-bold text-slate-900 text-sm">Computer Science & Engineering</h3>
+              <p class="text-xs font-semibold text-blue-600">{institution}</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
