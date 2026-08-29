@@ -1578,6 +1578,8 @@ function OpportunityDetailView({ navigate, isAuthenticated, currentUser, userPro
   };
 
   const handleRegister = async () => {
+    setShowSuccessModal(true);
+    setIsRegistered(true);
     setRegistering(true);
     try {
       let token = null;
@@ -1591,13 +1593,8 @@ function OpportunityDetailView({ navigate, isAuthenticated, currentUser, userPro
         headers,
         body: JSON.stringify({ userId: currentUser?.uid || 'usr_part_1' })
       });
-      
-      setIsRegistered(true);
-      setShowSuccessModal(true);
     } catch (e) {
       console.error(e);
-      setIsRegistered(true);
-      setShowSuccessModal(true);
     } finally {
       setRegistering(false);
     }
