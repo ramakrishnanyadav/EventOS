@@ -39,6 +39,10 @@ export function submitJudgeScore(
     db.prepare(`
       INSERT INTO scores (id, event_id, team_id, judge_user_id, rubric_version_id, criteria_scores_json, raw_score, submitted_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(judge_user_id, team_id, rubric_version_id) DO UPDATE SET
+        criteria_scores_json = excluded.criteria_scores_json,
+        raw_score = excluded.raw_score,
+        submitted_at = excluded.submitted_at
     `).run(scoreId, eventId, teamId, judgeUserId, rubricRow.id, JSON.stringify(criteriaScores), rawScore, now);
 
     // 4. Update normalized score table with default RAW score
