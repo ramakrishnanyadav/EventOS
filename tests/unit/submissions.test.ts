@@ -16,7 +16,7 @@ test('Submissions & Engagements Module Unit Tests', async (t) => {
 
   await t.test('joins opportunity registrations and generates submission-eligible engagement', () => {
     const userId = 'usr_part_1';
-    const oppId = 'opp_7'; // Seeded hackathon opportunity (EVENTOS Global Hackathon 2026)
+    const oppId = 'opp_7'; // Seeded hackathon opportunity
 
     registerForOpportunity(oppId, userId);
 
@@ -30,7 +30,7 @@ test('Submissions & Engagements Module Unit Tests', async (t) => {
   });
 
   await t.test('saves submission draft and updates status retrieved by getSubmissionById', () => {
-    const subId = 'sub_neuralshift_1'; // Existing seeded submission ID for team_42
+    const subId = 'sub_neuralshift_1';
     const eventId = 'event_hack_2026';
     const teamId = 'team_42';
     const userId = 'usr_part_1';
@@ -51,7 +51,7 @@ test('Submissions & Engagements Module Unit Tests', async (t) => {
     assert.strictEqual(saveRes.success, true);
     assert.strictEqual(saveRes.submission.status, 'DRAFT');
 
-    const fetched = getSubmissionById(subId);
+    const fetched = getSubmissionById(saveRes.submission.id);
     assert.ok(fetched);
     assert.strictEqual(fetched?.title, 'Test AI Agent OS');
     assert.strictEqual(fetched?.repo_url, 'https://github.com/test/repo');

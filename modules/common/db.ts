@@ -98,13 +98,14 @@ function initSchema(db: DatabaseSync): void {
 
     CREATE TABLE IF NOT EXISTS participants (
       id TEXT PRIMARY KEY,
-      user_id TEXT UNIQUE NOT NULL,
+      user_id TEXT NOT NULL,
       event_id TEXT NOT NULL,
       checked_in INTEGER NOT NULL DEFAULT 0,
       checkin_time TEXT,
       created_at TEXT NOT NULL,
       FOREIGN KEY (user_id) REFERENCES users(id),
-      FOREIGN KEY (event_id) REFERENCES events(id)
+      FOREIGN KEY (event_id) REFERENCES events(id),
+      CONSTRAINT unique_registration_per_event UNIQUE(user_id, event_id)
     );
 
     CREATE TABLE IF NOT EXISTS venues (

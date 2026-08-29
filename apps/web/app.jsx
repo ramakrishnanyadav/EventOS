@@ -2160,109 +2160,114 @@ function DeveloperProfileView({ userProfile, navigate }) {
 // --------------------------------------------------------------------------
 // 9. PARTICIPANT WORKSPACE VIEW (#/dashboard/my-events)
 // --------------------------------------------------------------------------
-function ParticipantWorkspaceView({ activeUserId, navigate, route, userProfile }) {
+function ParticipantWorkspaceView({ activeUserId, navigate, userProfile, currentUser }) {
   const [activeTab, setActiveTab] = useState('my-events');
-  const [engagements, setEngagements] = useState([]);
+  const [registrations, setRegistrations] = useState([]);
+  const [teams, setTeams] = useState([]);
+  const [submissions, setSubmissions] = useState([]);
+  const [schedule, setSchedule] = useState([]);
+  const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [matchResult, setMatchResult] = useState(null);
 
-  const currentUserId = activeUserId || 'usr_part_1';
+  const currentUserId = currentUser?.uid || activeUserId || 'usr_part_1';
 
-  const fetchEngagements = async () => {
+  useEffect(() => {
+    fetchWorkspaceData();
+  }, [currentUserId]);
+
+  const fetchWorkspaceData = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const res = await fetch(`/api/me/events?userId=${currentUserId}`);
-      const data = await res.json();
-      setEngagements(Array.isArray(data) ? data : []);
+      const [regRes, teamRes, subRes, schedRes, notifRes] = await Promise.all([
+        fetch(`/api/users/${currentUserId}/my-events`),
+        fetch(`/api/users/${currentUserId}/teams`),
+        fetch(`/api/users/${currentUserId}/submissions`),
+        fetch(`/api/users/${currentUserId}/schedule`),
+        fetch(`/api/users/${currentUserId}/notifications`),
+      ]);
+
+      const [regData, teamData, subData, schedData, notifData] = await Promise.all([
+        regRes.json(),
+        teamRes.json(),
+        subRes.json(),
+        schedRes.json(),
+        notifRes.json(),
+      ]);
+
+      setRegistrations(Array.isArray(regData) ? regData : []);
+      setTeams(Array.isArray(teamData) ? teamData : []);
+      setSubmissions(Array.isArray(subData) ? subData : []);
+      setSchedule(Array.isArray(schedData) ? schedData : []);
+      setNotifications(Array.isArray(notifData) ? notifData : []);
     } catch (e) {
       console.error(e);
-      setEngagements([]);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchEngagements();
-  }, [currentUserId]);
-
-  const handleMatch = async () => {
-    try {
-      const res = await fetch('/api/teams/matchmaking', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ candidateSkills: ['DevOps', 'Kubernetes', 'Cloud'] }),
-      });
-      const data = await res.json();
-      setMatchResult(data);
-    } catch (e) { console.error(e); }
-  };
-
-  // Compute nearest deadline active engagement for Next Best Action
-  const nextActionEngagement = engagements.find(e => e.accepts_submissions && e.submission_status !== 'FINAL') || engagements[0];
+  const activeSubmissionsCount = submissions.filter(s => s.status !== 'FINAL').length;
 
   return (
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-slide-up">
       
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
-        <div>
-          <h1 class="font-display font-extrabold text-xl text-slate-900">Participant Workspace</h1>
-          <p class="text-xs text-slate-500 font-medium">
-            {engagements.length} Registered Engagement{engagements.length === 1 ? '' : 's'} • Account: {userProfile?.name || currentUserId}
-          </p>
+      {/* Top Workspace Header & Devpost-Style Summary Strip */}
+      <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-2xs space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 class="font-display font-extrabold text-2xl text-slate-900">Participant Workspace</h1>
+            <p class="text-xs text-slate-500 font-medium">
+              Account: <strong class="text-slate-800">{userProfile?.name || currentUser?.displayName || currentUser?.email || currentUserId}</strong>
+            </p>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            {['my-events', 'teams', 'submissions', 'schedule', 'notifications'].map(t => (
+              <button
+                key={t}
+                onClick={() => setActiveTab(t)}
+                class={`px-4 py-2 rounded-xl text-xs font-bold capitalize transition-all ${activeTab === t ? 'bg-blue-600 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+              >
+                {t === 'my-events' ? 'My Events' : t}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div class="flex items-center space-x-2">
-          {['my-events', 'teams', 'submissions', 'schedule', 'notifications'].map(t => (
-            <button
-              key={t}
-              onClick={() => setActiveTab(t)}
-              class={`px-3.5 py-1.5 rounded-xl text-xs font-bold capitalize transition-all ${activeTab === t ? 'bg-blue-600 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-            >
-              {t}
-            </button>
-          ))}
+        {/* Section 4 Metric Summary Strip */}
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-slate-100 text-xs">
+          <div class="bg-blue-50/70 border border-blue-200 p-3 rounded-2xl flex items-center space-x-3">
+            <span class="text-lg">🎟️</span>
+            <div>
+              <span class="font-extrabold text-blue-900 block text-sm">{registrations.length}</span>
+              <span class="text-blue-700 font-medium">Active Registrations</span>
+            </div>
+          </div>
+
+          <div class="bg-amber-50/70 border border-amber-200 p-3 rounded-2xl flex items-center space-x-3">
+            <span class="text-lg">📝</span>
+            <div>
+              <span class="font-extrabold text-amber-900 block text-sm">{activeSubmissionsCount}</span>
+              <span class="text-amber-700 font-medium">Submissions In Progress</span>
+            </div>
+          </div>
+
+          <div class="bg-emerald-50/70 border border-emerald-200 p-3 rounded-2xl flex items-center space-x-3">
+            <span class="text-lg">📅</span>
+            <div>
+              <span class="font-extrabold text-emerald-900 block text-sm">{schedule.length}</span>
+              <span class="text-emerald-700 font-medium">Upcoming Sessions</span>
+            </div>
+          </div>
         </div>
       </div>
 
+      {/* 1. MY-EVENTS TAB */}
       {activeTab === 'my-events' && (
         <div class="space-y-6">
-          {/* Dynamic Contextual AI Action Card */}
-          {nextActionEngagement && (
-            <div class="bg-gradient-to-r from-blue-900 to-indigo-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl space-y-4">
-              <div class="flex items-center justify-between">
-                <span class="px-3 py-1 bg-amber-400/20 text-amber-300 border border-amber-400/40 text-xs font-extrabold rounded-full">
-                  ⚡ NEXT BEST ACTION
-                </span>
-                <span class="text-xs font-bold text-slate-300">
-                  Deadline: {nextActionEngagement.submission_deadline || 'Closing Soon'}
-                </span>
-              </div>
-
-              <div class="space-y-2">
-                <h2 class="font-display font-extrabold text-2xl sm:text-3xl text-white">
-                  {nextActionEngagement.submission_status === 'NOT_STARTED' ? `Start Submission: ${nextActionEngagement.event_name}` : `Update ${nextActionEngagement.event_name} Submission`}
-                </h2>
-                <p class="text-xs sm:text-sm text-blue-100 leading-relaxed font-medium max-w-2xl">
-                  Registration status: <strong>Verified</strong> • Team: <strong>{nextActionEngagement.team_name || 'Solo Participant'}</strong>. Current submission status: <strong class="text-amber-300 uppercase">{nextActionEngagement.submission_status}</strong>.
-                </p>
-              </div>
-
-              {nextActionEngagement.accepts_submissions && (
-                <button
-                  onClick={() => navigate(`#/submissions?eventId=${nextActionEngagement.event_id}`)}
-                  class="px-5 py-2.5 bg-blue-500 hover:bg-blue-600 text-white font-bold text-xs rounded-xl shadow-md transition-all active:scale-95"
-                >
-                  Go to Submission Portal ➔
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Registered Engagements List */}
           <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-2xs space-y-4">
             <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h2 class="font-display font-bold text-lg text-slate-900">Your Active Registrations</h2>
+              <h2 class="font-display font-bold text-lg text-slate-900">Your Registered Events & Opportunities</h2>
               <button onClick={() => navigate('#/discover')} class="text-xs font-bold text-blue-600 hover:underline">
                 + Browse Opportunities
               </button>
@@ -2270,8 +2275,8 @@ function ParticipantWorkspaceView({ activeUserId, navigate, route, userProfile }
 
             {loading ? (
               <div class="p-8 text-center text-xs font-medium text-slate-400">Loading registrations...</div>
-            ) : engagements.length === 0 ? (
-              /* Empty state per Section 2 requirements */
+            ) : registrations.length === 0 ? (
+              /* Section 3 Requirement: Empty state for 0 registrations */
               <div class="p-10 text-center space-y-3 bg-slate-50 rounded-2xl border border-dashed border-slate-300">
                 <div class="text-3xl">🚀</div>
                 <h3 class="font-bold text-slate-800 text-sm">You haven't registered for anything yet</h3>
@@ -2280,46 +2285,37 @@ function ParticipantWorkspaceView({ activeUserId, navigate, route, userProfile }
                 </p>
                 <button
                   onClick={() => navigate('#/discover')}
-                  class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md transition-all"
+                  class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-md transition-all"
                 >
                   Browse Opportunities ➔
                 </button>
               </div>
             ) : (
-              <div class="space-y-3">
-                {engagements.map((eng) => (
-                  <div key={eng.event_id} class="p-4 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-2xl transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div class="space-y-1">
-                      <div class="flex items-center space-x-2">
-                        <span class="px-2 py-0.5 text-[10px] font-extrabold bg-blue-100 text-blue-800 rounded-md">
-                          {eng.registration_type}
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {registrations.map(reg => (
+                  <div key={reg.id} class="bg-slate-50 hover:bg-slate-100/80 p-5 rounded-2xl border border-slate-200 transition-all flex flex-col justify-between space-y-4">
+                    <div class="space-y-2">
+                      <div class="flex items-center justify-between">
+                        <span class="px-2.5 py-0.5 text-[10px] font-extrabold bg-blue-100 text-blue-800 rounded-md">
+                          {reg.kind}
                         </span>
-                        <h3 class="font-extrabold text-slate-900 text-sm">{eng.event_name}</h3>
+                        <span class="px-2.5 py-0.5 text-[10px] font-extrabold bg-emerald-100 text-emerald-800 rounded-full border border-emerald-300">
+                          {reg.status}
+                        </span>
                       </div>
-                      <p class="text-xs text-slate-500 font-medium">
-                        Team: {eng.team_name || 'Solo Participant'} • Deadline: {eng.submission_deadline || 'Active'}
-                      </p>
+
+                      <h3 class="font-display font-extrabold text-base text-slate-900 line-clamp-1">{reg.title}</h3>
+                      <p class="text-xs text-slate-500 font-medium">{reg.org_name} • {reg.deadline_or_dates}</p>
                     </div>
 
-                    <div class="flex items-center space-x-3">
-                      <span class={`px-2.5 py-1 text-xs font-extrabold rounded-full ${
-                        eng.submission_status === 'FINAL'
-                          ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                          : eng.submission_status === 'DRAFT'
-                          ? 'bg-amber-100 text-amber-800 border border-amber-300'
-                          : 'bg-slate-200 text-slate-700'
-                      }`}>
-                        {eng.submission_status === 'FINAL' ? 'Submitted ✓' : eng.submission_status === 'DRAFT' ? 'Draft Saved 📝' : 'Not Started ⏳'}
-                      </span>
-
-                      {eng.accepts_submissions && (
-                        <button
-                          onClick={() => navigate(`#/submissions?eventId=${eng.event_id}`)}
-                          class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all"
-                        >
-                          Submission Portal ➔
-                        </button>
-                      )}
+                    <div class="pt-3 border-t border-slate-200/80 flex items-center justify-between">
+                      <span class="text-[11px] text-slate-400 font-medium">Registered</span>
+                      <button
+                        onClick={() => navigate(reg.cta_route)}
+                        class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all"
+                      >
+                        View Details ➔
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -2329,59 +2325,142 @@ function ParticipantWorkspaceView({ activeUserId, navigate, route, userProfile }
         </div>
       )}
 
+      {/* 2. TEAMS TAB */}
       {activeTab === 'teams' && (
-        <div class="glass-card rounded-3xl p-6 border border-slate-200 shadow-glass space-y-4">
-          <div class="flex items-center justify-between">
-            <h2 class="font-display font-bold text-lg text-slate-900">Intelligent Team Matchmaking</h2>
-            <button onClick={handleMatch} class="px-4 py-2 bg-blue-600 text-white font-bold text-xs rounded-xl">Run Matchmaker</button>
+        <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-2xs space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h2 class="font-display font-bold text-lg text-slate-900">Your Hackathon & Competition Teams</h2>
+            <button onClick={() => navigate('#/discover')} class="text-xs font-bold text-blue-600 hover:underline">
+              Find More Events
+            </button>
           </div>
 
-          {matchResult && (
-            <div class="bg-blue-50 border border-blue-200 rounded-2xl p-5 space-y-2 text-xs">
-              <div class="flex justify-between font-bold text-blue-900">
-                <span>Candidate: {matchResult.candidate_name}</span>
-                <span class="text-emerald-700 font-extrabold">{matchResult.compatibility_score}% Compatibility Match</span>
-              </div>
-              <div class="text-blue-800 space-y-1">
-                {matchResult.reasons?.map((r, i) => <div key={i}>{r}</div>)}
-              </div>
+          {loading ? (
+            <div class="p-8 text-center text-xs font-medium text-slate-400">Loading teams...</div>
+          ) : teams.length === 0 ? (
+            <div class="p-10 text-center space-y-3 bg-slate-50 rounded-2xl border border-dashed border-slate-300">
+              <div class="text-3xl">👥</div>
+              <h3 class="font-bold text-slate-800 text-sm">No Active Teams Joined</h3>
+              <p class="text-xs text-slate-500 max-w-md mx-auto">
+                Register for a hackathon or competition to create or join a team.
+              </p>
+            </div>
+          ) : (
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {teams.map(t => (
+                <div key={t.team_id} class="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <span class="text-[10px] font-bold text-blue-600 uppercase tracking-wider block">{t.event_name}</span>
+                      <h3 class="font-extrabold text-slate-900 text-base">{t.team_name}</h3>
+                    </div>
+                    <span class="px-2.5 py-1 bg-blue-100 text-blue-800 font-extrabold text-xs rounded-full">{t.role}</span>
+                  </div>
+
+                  <div class="space-y-1 pt-2 border-t border-slate-200/60 text-xs">
+                    <span class="font-bold text-slate-500 text-[11px]">Team Members ({t.members.length}):</span>
+                    <div class="flex flex-wrap gap-2 pt-1">
+                      {t.members.map(m => (
+                        <span key={m.id} class="px-2.5 py-1 bg-white border border-slate-200 text-slate-800 font-bold rounded-lg shadow-2xs">
+                          👤 {m.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
       )}
 
+      {/* 3. SUBMISSIONS TAB */}
       {activeTab === 'submissions' && (
         <SubmissionWorkspaceView navigate={navigate} activeUserId={currentUserId} />
       )}
 
+      {/* 4. SCHEDULE TAB */}
       {activeTab === 'schedule' && (
-        <div class="glass-card rounded-3xl p-6 border border-slate-200 shadow-glass space-y-4">
-          <h2 class="font-display font-bold text-lg text-slate-900">Personalized Live Schedule</h2>
-          <div class="bg-white p-4 rounded-2xl border border-slate-200 space-y-2 text-xs">
-            <div class="flex justify-between font-bold text-slate-900">
-              <span>AI Agentic Operations Masterclass</span>
-              <span class="text-rose-600">Hall B (96% Capacity)</span>
+        <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-2xs space-y-4">
+          <h2 class="font-display font-bold text-lg text-slate-900">Personalized Event Schedule & Transit Recommendations</h2>
+          
+          {loading ? (
+            <div class="p-8 text-center text-xs font-medium text-slate-400">Loading schedule...</div>
+          ) : schedule.length === 0 ? (
+            <div class="p-8 text-center text-xs font-medium text-slate-500 bg-slate-50 rounded-2xl">
+              No upcoming scheduled sessions found for your registered events.
             </div>
-            <p class="text-slate-500 font-medium">Starts at 15:00 • Hall B</p>
-            <div class="p-2.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-xl font-bold">
-              EVENTOS recommendation: Leave by 14:45 to avoid congestion delay.
+          ) : (
+            <div class="space-y-3">
+              {schedule.map(s => (
+                <div key={s.session_id} class="p-5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
+                  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <span class="text-[10px] font-bold text-blue-600 uppercase tracking-wider">{s.event_name}</span>
+                      <h3 class="font-extrabold text-slate-900 text-sm">{s.title}</h3>
+                    </div>
+                    <span class={`px-3 py-1 font-extrabold text-xs rounded-full ${
+                      s.congestion_level === 'CRITICAL'
+                        ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                        : s.congestion_level === 'ELEVATED'
+                        ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                        : 'bg-emerald-100 text-emerald-800'
+                    }`}>
+                      {s.venue_name} ({s.capacity_pct}% Capacity)
+                    </span>
+                  </div>
+
+                  <p class="text-xs text-slate-500 font-medium">Starts: {s.start_time} • Ends: {s.end_time}</p>
+
+                  <div class={`p-3 rounded-xl font-bold text-xs border ${
+                    s.congestion_level === 'CRITICAL' ? 'bg-rose-50 text-rose-900 border-rose-200' : 'bg-amber-50 text-amber-900 border-amber-200'
+                  }`}>
+                    {s.recommendation}
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
+          )}
         </div>
       )}
 
+      {/* 5. NOTIFICATIONS TAB */}
       {activeTab === 'notifications' && (
-        <div class="glass-card rounded-3xl p-6 border border-slate-200 shadow-glass space-y-4">
-          <h2 class="font-display font-bold text-lg text-slate-900">Contextual Notifications</h2>
-          <div class="space-y-3 text-xs">
-            <div class="bg-white p-4 rounded-2xl border border-slate-200 flex items-center justify-between">
-              <div>
-                <strong class="text-slate-900 block font-bold">Demo URL Missing</strong>
-                <span class="text-slate-500">Submission closes in 28 minutes.</span>
-              </div>
-              <button onClick={() => navigate('#/submissions')} class="px-3.5 py-1.5 bg-blue-600 text-white font-bold rounded-xl">Complete ➔</button>
+        <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-2xs space-y-4">
+          <h2 class="font-display font-bold text-lg text-slate-900">State-Derived Contextual Notifications</h2>
+          
+          {loading ? (
+            <div class="p-8 text-center text-xs font-medium text-slate-400">Loading notifications...</div>
+          ) : notifications.length === 0 ? (
+            <div class="p-8 text-center text-xs font-medium text-slate-500 bg-slate-50 rounded-2xl">
+              ✓ All submissions and schedule alerts up to date!
             </div>
-          </div>
+          ) : (
+            <div class="space-y-3">
+              {notifications.map(n => (
+                <div key={n.id} class="p-4 bg-slate-50 border border-slate-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div class="space-y-1">
+                    <div class="flex items-center space-x-2">
+                      <span class={`px-2 py-0.5 text-[10px] font-extrabold rounded-md ${
+                        n.urgency === 'HIGH' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {n.urgency}
+                      </span>
+                      <strong class="text-slate-900 text-sm font-bold">{n.title}</strong>
+                    </div>
+                    <p class="text-xs text-slate-600 font-medium">{n.message}</p>
+                  </div>
+
+                  <button
+                    onClick={() => navigate(n.cta_route)}
+                    class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all whitespace-nowrap"
+                  >
+                    {n.cta_label}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -2389,43 +2468,43 @@ function ParticipantWorkspaceView({ activeUserId, navigate, route, userProfile }
 }
 
 // --------------------------------------------------------------------------
-// 10. SUBMISSION WORKSPACE VIEW (#/submissions) — Multi-Event Submission Portal
+// 10. SUBMISSION WORKSPACE VIEW (#/submissions) — Per-Event Submission Manager
 // --------------------------------------------------------------------------
 function SubmissionWorkspaceView({ navigate, activeUserId }) {
-  const [engagements, setEngagements] = useState([]);
-  const [selectedEngId, setSelectedEngId] = useState('');
+  const [submissionItems, setSubmissionItems] = useState([]);
+  const [selectedEventId, setSelectedEventId] = useState('');
   const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [githubUrl, setGithubUrl] = useState('');
+  const [problemStatement, setProblemStatement] = useState('');
+  const [solutionSummary, setSolutionSummary] = useState('');
+  const [repoUrl, setRepoUrl] = useState('');
   const [demoUrl, setDemoUrl] = useState('');
-  const [completionPct, setCompletionPct] = useState(70);
   const [saving, setSaving] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
   const [loading, setLoading] = useState(true);
 
   const currentUserId = activeUserId || 'usr_part_1';
 
-  // Extract optional eventId from query string
+  // Extract optional eventId from query string hash e.g. #/submissions?eventId=event_hack_2026
   const urlEventId = window.location.hash.includes('?') 
     ? new URLSearchParams(window.location.hash.split('?')[1]).get('eventId') 
     : '';
 
   useEffect(() => {
-    loadEligibleEngagements();
+    fetchSubmissions();
   }, [currentUserId]);
 
-  const loadEligibleEngagements = async () => {
+  const fetchSubmissions = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const res = await fetch(`/api/me/events?userId=${currentUserId}`);
+      const res = await fetch(`/api/users/${currentUserId}/submissions`);
       const data = await res.json();
-      const eligible = Array.isArray(data) ? data.filter(e => e.accepts_submissions) : [];
-      setEngagements(eligible);
+      const items = Array.isArray(data) ? data : [];
+      setSubmissionItems(items);
 
-      if (eligible.length > 0) {
-        const match = eligible.find(e => e.event_id === urlEventId) || eligible[0];
-        setSelectedEngId(match.event_id);
-        loadSubmissionDetails(match.submission_id);
+      if (items.length > 0) {
+        const initialId = urlEventId && items.some(i => i.event_id === urlEventId) ? urlEventId : items[0].event_id;
+        setSelectedEventId(initialId);
+        loadPerEventSubmission(initialId);
       }
     } catch (e) {
       console.error(e);
@@ -2434,79 +2513,77 @@ function SubmissionWorkspaceView({ navigate, activeUserId }) {
     }
   };
 
-  const loadSubmissionDetails = async (subId) => {
-    if (!subId) return;
+  const loadPerEventSubmission = async (eventId) => {
+    if (!eventId) return;
     try {
-      const res = await fetch(`/api/submissions/${subId}`);
+      const res = await fetch(`/api/events/${eventId}/submissions/mine?userId=${currentUserId}`);
       if (res.ok) {
         const sub = await res.json();
         setTitle(sub.title || '');
-        setDescription(sub.problem_statement || sub.solution_summary || '');
-        setGithubUrl(sub.repo_url || '');
+        setProblemStatement(sub.problem_statement || '');
+        setSolutionSummary(sub.solution_summary || '');
+        setRepoUrl(sub.repo_url || '');
         setDemoUrl(sub.demo_url || '');
-        setCompletionPct(sub.completion_pct || 75);
       }
     } catch (e) {
       console.error(e);
     }
   };
 
-  const activeEng = engagements.find(e => e.event_id === selectedEngId) || engagements[0];
+  const activeItem = submissionItems.find(i => i.event_id === selectedEventId) || submissionItems[0];
 
-  const handleSelectEvent = (eng) => {
-    setSelectedEngId(eng.event_id);
-    loadSubmissionDetails(eng.submission_id);
+  const handleSelectEvent = (eventId) => {
+    setSelectedEventId(eventId);
+    loadPerEventSubmission(eventId);
   };
 
   const handleSave = async (isFinal = false) => {
-    if (!activeEng) return;
+    if (!selectedEventId) return;
     setSaving(true);
     setStatusMsg('');
 
-    const subId = activeEng.submission_id || `sub_${activeEng.event_id}_${currentUserId}`;
-
     try {
-      const res = await fetch(`/api/submissions/${subId}`, {
+      const res = await fetch(`/api/events/${selectedEventId}/submissions/mine`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          eventId: activeEng.event_id,
-          teamId: activeEng.team_id || `team_${activeEng.event_id}`,
-          title: title || activeEng.event_name,
-          description,
-          githubUrl,
-          demoUrl,
-          completionPct: isFinal ? 100 : completionPct,
+          userId: currentUserId,
+          title,
+          problem_statement: problemStatement,
+          solution_summary: solutionSummary,
+          repo_url: repoUrl,
+          demo_url: demoUrl,
           isFinal,
-          actorId: currentUserId,
         }),
       });
 
       const data = await res.json();
       if (data.success) {
-        setStatusMsg(isFinal ? '🎉 Final Submission Confirmed & Submitted!' : '✓ Draft Submission Saved Successfully!');
-        activeEng.submission_status = isFinal ? 'FINAL' : 'DRAFT';
+        setStatusMsg(isFinal ? '🎉 Final Project Submitted Successfully!' : '✓ Draft Submission Saved Successfully!');
+        fetchSubmissions();
+      } else {
+        setStatusMsg(`✕ ${data.message || 'Error saving submission'}`);
       }
     } catch (e) {
-      setStatusMsg('✕ Error saving submission. Please try again.');
+      setStatusMsg('✕ Connection Error saving submission.');
     } finally {
       setSaving(false);
     }
   };
 
   if (loading) {
-    return <div class="max-w-4xl mx-auto py-12 px-4 text-center text-slate-400 font-medium">Loading submission portal...</div>;
+    return <div class="max-w-4xl mx-auto py-12 px-4 text-center text-slate-400 font-medium">Loading submission manager...</div>;
   }
 
-  // Section 3 Requirement: 0 eligible engagements empty state
-  if (engagements.length === 0) {
+  // Section 3 Requirement: 0 submittable teams empty state
+  if (submissionItems.length === 0) {
     return (
       <div class="max-w-3xl mx-auto py-12 px-4 space-y-4 text-center">
         <div class="bg-white rounded-3xl p-10 border border-slate-200 shadow-xl space-y-4">
           <div class="text-4xl">🏆</div>
-          <h2 class="font-display font-extrabold text-2xl text-slate-900">No Submission-Eligible Events</h2>
+          <h2 class="font-display font-extrabold text-2xl text-slate-900">No Active Event Submissions</h2>
           <p class="text-xs text-slate-600 font-medium max-w-md mx-auto">
-            You are not currently registered for any active hackathons or competitions that accept project submissions.
+            You are not currently part of any team in an active hackathon or competition.
           </p>
           <button
             onClick={() => navigate('#/discover')}
@@ -2522,117 +2599,141 @@ function SubmissionWorkspaceView({ navigate, activeUserId }) {
   return (
     <div class="max-w-4xl mx-auto py-8 px-4 animate-slide-up space-y-6">
       
-      {/* Event Selector Tabs (Section 3 Requirement for 2+ eligible events) */}
-      {engagements.length > 1 && (
-        <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-2xs space-y-2">
-          <span class="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider px-2">Select Event to Submit To</span>
-          <div class="flex flex-wrap gap-2">
-            {engagements.map((e) => (
-              <button
-                key={e.event_id}
-                onClick={() => handleSelectEvent(e)}
-                class={`px-4 py-2 rounded-xl text-xs font-bold transition-all border ${
-                  selectedEngId === e.event_id
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+      {/* Event Selector Cards (Section 3 Requirement for 2+ events) */}
+      {submissionItems.length > 1 && (
+        <div class="bg-white p-4 rounded-3xl border border-slate-200 shadow-2xs space-y-3">
+          <span class="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block">Your Hackathon Submissions ({submissionItems.length})</span>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {submissionItems.map((item) => (
+              <div
+                key={item.event_id}
+                onClick={() => handleSelectEvent(item.event_id)}
+                class={`p-4 rounded-2xl border cursor-pointer transition-all ${
+                  selectedEventId === item.event_id
+                    ? 'bg-blue-50 border-blue-600 ring-2 ring-blue-600/20 shadow-xs'
+                    : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
                 }`}
               >
-                {e.event_name}
-              </button>
+                <div class="flex items-center justify-between">
+                  <h3 class="font-extrabold text-slate-900 text-xs line-clamp-1">{item.event_name}</h3>
+                  <span class={`px-2 py-0.5 text-[10px] font-extrabold rounded-full ${
+                    item.status === 'FINAL' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                  }`}>
+                    {item.status} ({item.completion_pct}%)
+                  </span>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-1 font-medium">Team: {item.team_name}</p>
+              </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Submission Form Card */}
-      <div class="glass-card rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-glass space-y-6">
-        <div class="flex items-center justify-between border-b border-slate-200 pb-4">
-          <div>
-            <span class="px-2.5 py-0.5 text-[10px] font-extrabold bg-blue-100 text-blue-800 rounded-md">
-              {activeEng.event_name}
-            </span>
-            <h2 class="font-display font-bold text-xl text-slate-900 mt-1">Developer Submission Portal</h2>
-            <p class="text-xs text-slate-500 font-medium">Team: {activeEng.team_name || 'Solo Participant'} • Deadline: {activeEng.submission_deadline || 'Active'}</p>
+      {/* Selected Event Submission Editor Form */}
+      {activeItem && (
+        <div class="glass-card rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-glass space-y-6">
+          <div class="flex items-center justify-between border-b border-slate-200 pb-4">
+            <div>
+              <span class="px-2.5 py-0.5 text-[10px] font-extrabold bg-blue-100 text-blue-800 rounded-md">
+                {activeItem.event_name}
+              </span>
+              <h2 class="font-display font-bold text-xl text-slate-900 mt-1">Project Submission Editor</h2>
+              <p class="text-xs text-slate-500 font-medium">Team: {activeItem.team_name} • Deadline: {activeItem.deadline}</p>
+            </div>
+            
+            <div class="text-right space-y-1">
+              <span class={`px-3 py-1 font-extrabold text-xs rounded-full inline-block ${
+                activeItem.status === 'FINAL' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'
+              }`}>
+                {activeItem.status === 'FINAL' ? 'FINAL SUBMITTED ✓' : `${activeItem.completion_pct}% Complete`}
+              </span>
+            </div>
           </div>
-          <span class={`px-3 py-1 font-extrabold text-xs rounded-full ${
-            activeEng.submission_status === 'FINAL' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'
-          }`}>
-            {activeEng.submission_status === 'FINAL' ? 'FINAL SUBMISSION ✓' : `${completionPct}% Progress`}
-          </span>
+
+          {statusMsg && (
+            <div class={`p-4 rounded-2xl text-xs font-bold border animate-slide-up ${
+              statusMsg.includes('🎉') || statusMsg.includes('✓') ? 'bg-emerald-50 text-emerald-900 border-emerald-200' : 'bg-rose-50 text-rose-900 border-rose-200'
+            }`}>
+              {statusMsg}
+            </div>
+          )}
+
+          <div class="space-y-4 text-xs">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">Project Name / Title (+20%)</label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Enter project name..."
+                class="w-full bg-white border border-slate-200 rounded-xl p-2.5 font-semibold text-slate-800"
+              />
+            </div>
+
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">Problem Statement (+20%)</label>
+              <textarea
+                rows="2"
+                value={problemStatement}
+                onChange={(e) => setProblemStatement(e.target.value)}
+                placeholder="What problem does your project solve?"
+                class="w-full bg-white border border-slate-200 rounded-xl p-2.5 font-medium text-slate-800"
+              ></textarea>
+            </div>
+
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">Solution Summary & Architecture (+20%)</label>
+              <textarea
+                rows="2"
+                value={solutionSummary}
+                onChange={(e) => setSolutionSummary(e.target.value)}
+                placeholder="Describe key features and technical stack..."
+                class="w-full bg-white border border-slate-200 rounded-xl p-2.5 font-medium text-slate-800"
+              ></textarea>
+            </div>
+
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">GitHub Repository URL (+20%)</label>
+              <input
+                type="text"
+                value={repoUrl}
+                onChange={(e) => setRepoUrl(e.target.value)}
+                placeholder="https://github.com/username/project"
+                class="w-full bg-white border border-slate-200 rounded-xl p-2.5 font-mono text-slate-800"
+              />
+            </div>
+
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">Live Demo / Video URL (+20%)</label>
+              <input
+                type="text"
+                value={demoUrl}
+                onChange={(e) => setDemoUrl(e.target.value)}
+                placeholder="https://demo.example.com"
+                class="w-full bg-white border border-slate-200 rounded-xl p-2.5 font-mono text-slate-800"
+              />
+            </div>
+
+            <div class="pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
+              <button
+                onClick={() => handleSave(false)}
+                disabled={saving}
+                class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl transition-all"
+              >
+                {saving ? 'Saving...' : 'Save Draft Submission'}
+              </button>
+
+              <button
+                onClick={() => handleSave(true)}
+                disabled={saving}
+                class="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-all active:scale-95"
+              >
+                {saving ? 'Submitting...' : 'Submit Final Project ➔'}
+              </button>
+            </div>
+          </div>
         </div>
-
-        {statusMsg && (
-          <div class={`p-4 rounded-2xl text-xs font-bold border animate-slide-up ${
-            statusMsg.includes('🎉') || statusMsg.includes('✓') ? 'bg-emerald-50 text-emerald-900 border-emerald-200' : 'bg-rose-50 text-rose-900 border-rose-200'
-          }`}>
-            {statusMsg}
-          </div>
-        )}
-
-        <div class="space-y-4 text-xs">
-          <div>
-            <label class="block font-bold text-slate-700 mb-1">Project Name / Title</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. NeuralShift Agent OS"
-              class="w-full bg-white border border-slate-200 rounded-xl p-2.5 font-semibold text-slate-800"
-            />
-          </div>
-
-          <div>
-            <label class="block font-bold text-slate-700 mb-1">Problem Statement & Solution Summary</label>
-            <textarea
-              rows="3"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Describe what you built and how it solves the problem..."
-              class="w-full bg-white border border-slate-200 rounded-xl p-2.5 font-medium text-slate-800"
-            ></textarea>
-          </div>
-
-          <div>
-            <label class="block font-bold text-slate-700 mb-1">GitHub Repository URL</label>
-            <input
-              type="text"
-              value={githubUrl}
-              onChange={(e) => setGithubUrl(e.target.value)}
-              placeholder="https://github.com/username/project"
-              class="w-full bg-white border border-slate-200 rounded-xl p-2.5 font-mono text-slate-800"
-            />
-          </div>
-
-          <div>
-            <label class="block font-bold text-slate-700 mb-1">Live Demo / Video URL</label>
-            <input
-              type="text"
-              value={demoUrl}
-              onChange={(e) => setDemoUrl(e.target.value)}
-              placeholder="https://demo.example.com"
-              class="w-full bg-white border border-slate-200 rounded-xl p-2.5 font-mono text-slate-800"
-            />
-          </div>
-
-          <div class="pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
-            <button
-              onClick={() => handleSave(false)}
-              disabled={saving}
-              class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl transition-all"
-            >
-              {saving ? 'Saving...' : 'Save Draft Submission'}
-            </button>
-
-            <button
-              onClick={() => handleSave(true)}
-              disabled={saving}
-              class="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-all active:scale-95"
-            >
-              {saving ? 'Submitting...' : 'Submit Final Project ➔'}
-            </button>
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

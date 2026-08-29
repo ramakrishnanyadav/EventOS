@@ -9,8 +9,22 @@ import { processUnprocessedOutboxEvents, emitOutboxEvent } from '../../modules/c
 import { generateQRCredential, verifyQRCredentialOffline, processCheckInSync, getServerPublicKeyPem } from '../../modules/attendance/index.js';
 import { handleAssistantQuery } from '../../intelligence/assistant/index.js';
 import { submitJudgeScore } from '../../modules/judging/index.js';
-import { getMyEventEngagements, getParticipantByUserId } from '../../modules/participants/index.js';
-import { getSubmissionById, saveSubmission, updateSubmission } from '../../modules/submissions/index.js';
+import {
+  getMyEventEngagements,
+  getParticipantByUserId,
+  getMyRegistrations,
+  getMyTeams,
+  getMySubmissions,
+  getMySchedule,
+  getMyNotifications,
+} from '../../modules/participants/index.js';
+import {
+  getSubmissionById,
+  saveSubmission,
+  updateSubmission,
+  getSubmissionForUserEvent,
+  upsertUserEventSubmission,
+} from '../../modules/submissions/index.js';
 import { rebuildLeaderboardProjection, getLeaderboardSnapshot, getUserLeaderboardSnapshot } from '../../modules/ranking/index.js';
 import { getAllVenues } from '../../modules/venues/index.js';
 import { computeTeamCompatibility, computeSimulationOutcome } from '../../intelligence/rules/index.js';
@@ -297,6 +311,75 @@ app.post('/api/submissions/:id', (req, res) => {
       actor
     );
 
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// --------------------------------------------------------------------------
+// PARTICIPANT WORKSPACE REST APIS (Section 1 & 2 Requirements)
+// --------------------------------------------------------------------------
+app.get('/api/users/:userId/my-events', (req, res) => {
+  try {
+    const regs = getMyRegistrations(req.params.userId);
+    res.json(regs);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/users/:userId/teams', (req, res) => {
+  try {
+    const teams = getMyTeams(req.params.userId);
+    res.json(teams);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/users/:userId/submissions', (req, res) => {
+  try {
+    const subs = getMySubmissions(req.params.userId);
+    res.json(subs);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/users/:userId/schedule', (req, res) => {
+  try {
+    const sched = getMySchedule(req.params.userId);
+    res.json(sched);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/users/:userId/notifications', (req, res) => {
+  try {
+    const notifs = getMyNotifications(req.params.userId);
+    res.json(notifs);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Section 2: Per-Event Submission API
+app.get('/api/events/:eventId/submissions/mine', (req, res) => {
+  try {
+    const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string) || 'usr_part_1';
+    const sub = getSubmissionForUserEvent(userId, req.params.eventId);
+    res.json(sub);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/events/:eventId/submissions/mine', (req, res) => {
+  try {
+    const userId = (req.body.userId as string) || (req.headers['x-user-id'] as string) || 'usr_part_1';
+    const result = upsertUserEventSubmission(userId, req.params.eventId, req.body);
     res.json(result);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
