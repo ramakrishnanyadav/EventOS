@@ -24,6 +24,7 @@ import {
   updateSubmission,
   getSubmissionForUserEvent,
   upsertUserEventSubmission,
+  getAllSubmissionsForJudging,
 } from '../../modules/submissions/index.js';
 import { rebuildLeaderboardProjection, getLeaderboardSnapshot, getUserLeaderboardSnapshot } from '../../modules/ranking/index.js';
 import { getAllVenues } from '../../modules/venues/index.js';
@@ -329,6 +330,16 @@ app.get('/api/me/events', (req, res) => {
     const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string) || 'usr_part_1';
     const engagements = getMyEventEngagements(userId);
     res.json(engagements);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/judging/submissions', (req, res) => {
+  try {
+    const eventId = (req.query.eventId as string) || '';
+    const subs = getAllSubmissionsForJudging(eventId);
+    res.json(subs);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

@@ -3058,82 +3058,364 @@ function SubmissionWorkspaceView({ navigate, activeUserId }) {
 }
 
 // --------------------------------------------------------------------------
-// 11. JUDGE DESK VIEW (#/judge)
+// 11. JUDGE DESK VIEW (#/judge) — Interactive Participant Submissions & Rubric Scoring
 // --------------------------------------------------------------------------
 function JudgeDeskView({ activeUserId, navigate, route, leaderboard, setLeaderboard, setSequenceNumber }) {
+  const { currentUser } = useCurrentUser();
+  const judgeId = currentUser?.uid || activeUserId || 'usr_judge_1';
+  const judgeName = currentUser?.displayName || currentUser?.email || 'Dr. Aris Smith';
+
+  const [submissionsList, setSubmissionsList] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedSub, setSelectedSub] = useState(null);
-  const [rawScore, setRawScore] = useState(92);
-  const [feedback, setFeedback] = useState('Excellent context engine architecture.');
+
+  // Rubric Criterion Scores
+  const [techScore, setTechScore] = useState(38);
+  const [impactScore, setImpactScore] = useState(36);
+  const [designScore, setDesignScore] = useState(18);
+  const [feedback, setFeedback] = useState('Outstanding context-aware system architecture and robust offline handling.');
+  const [submitting, setSubmitting] = useState(false);
+  const [scoreMsg, setScoreMsg] = useState('');
+
+  useEffect(() => {
+    fetchSubmissions();
+  }, []);
+
+  const fetchSubmissions = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/judging/submissions');
+      if (res.ok) {
+        const data = await res.json();
+        setSubmissionsList(Array.isArray(data) ? data : []);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const totalRawScore = Math.min(100, Math.round(Number(techScore || 0) + Number(impactScore || 0) + Number(designScore || 0)));
+
+  const handleSelectSubmission = (sub) => {
+    setSelectedSub(sub);
+    setScoreMsg('');
+    setTechScore(38);
+    setImpactScore(36);
+    setDesignScore(18);
+  };
 
   const handleSubmitScore = async (e) => {
     e.preventDefault();
+    if (!selectedSub) return;
+    setSubmitting(true);
+    setScoreMsg('');
+
     try {
       const res = await fetch('/api/judging/score', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          eventId: DEFAULT_EVENT_ID,
-          teamId: 'team_42',
-          judgeUserId: activeUserId,
-          criteriaScores: { tech: rawScore * 0.4, impact: rawScore * 0.4, design: rawScore * 0.2 },
-          rawScore: parseFloat(rawScore),
-          actorId: activeUserId,
+          eventId: selectedSub.event_id || DEFAULT_EVENT_ID,
+          teamId: selectedSub.team_id || 'team_42',
+          judgeUserId: judgeId,
+          criteriaScores: {
+            tech: Number(techScore),
+            impact: Number(impactScore),
+            design: Number(designScore),
+          },
+          rawScore: totalRawScore,
+          actorId: judgeId,
           strategy: 'RAW',
+          feedback: feedback,
         }),
       });
 
       const data = await res.json();
-      if (!res.ok) return alert(data.message);
+      if (!res.ok) throw new Error(data.message || 'Failed to submit score');
 
       if (data.leaderboard) {
         setLeaderboard(data.leaderboard.rankings);
         setSequenceNumber(data.leaderboard.sequence_number);
       }
-      alert(`Score submitted successfully! Leaderboard projection updated to Seq #${data.leaderboard.sequence_number}`);
-      setSelectedSub(null);
-    } catch (e) { alert(e.message); }
+
+      setScoreMsg(`🎉 Score of ${totalRawScore}/100 submitted successfully! Live leaderboard updated.`);
+      setTimeout(() => {
+        setSelectedSub(null);
+        fetchSubmissions();
+      }, 1500);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-slide-up">
-      <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-2xs flex items-center justify-between">
+      {/* Header Shell */}
+      <div class="bg-gradient-to-r from-amber-900 via-slate-900 to-amber-950 rounded-3xl p-6 sm:p-8 text-white shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 class="font-display font-extrabold text-xl text-slate-900">Judge Desk — Dr. Aris Smith</h1>
-          <p class="text-xs text-slate-500 font-medium">Evaluation Queue • 4 Pending Submissions</p>
+          <div class="flex items-center space-x-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+            <span class="text-xs font-extrabold text-amber-300 tracking-wider uppercase">OFFICIAL JUDGING PORTAL</span>
+          </div>
+          <h1 class="font-display font-extrabold text-2xl sm:text-3xl text-white mt-1">
+            Judge Evaluation Desk
+          </h1>
+          <p class="text-xs text-amber-100 font-medium">Judge Account: {judgeName}</p>
         </div>
-        <span class="px-3 py-1 bg-blue-50 text-blue-700 border border-blue-200 text-xs font-bold rounded-full">Rubric v1 Active</span>
+
+        <div class="flex items-center space-x-3">
+          <span class="px-3.5 py-1.5 bg-amber-400/20 text-amber-200 border border-amber-400/30 text-xs font-bold rounded-full">
+            Rubric v1 Active (Tech 40% • Impact 40% • Design 20%)
+          </span>
+        </div>
       </div>
 
       {!selectedSub ? (
-        <div class="glass-card rounded-3xl p-6 border border-slate-200 shadow-glass space-y-4">
-          <h2 class="font-display font-bold text-lg text-slate-900">Pending Evaluation Queue</h2>
-          <div class="bg-white p-4 rounded-2xl border border-slate-200 flex items-center justify-between">
+        /* QUEUE OF ALL PARTICIPANT SUBMISSIONS */
+        <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-2xs space-y-6">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
             <div>
-              <span class="px-2 py-0.5 bg-rose-50 text-rose-700 text-[10px] font-bold rounded">Rank #1 Pressure</span>
-              <h3 class="font-bold text-slate-900 text-sm mt-1">Team 42 — NeuralShift</h3>
-              <p class="text-xs text-slate-500">Submitted 45 min ago • Track: AI Agents</p>
+              <h2 class="font-display font-extrabold text-xl text-slate-900">Submitted Participant Projects</h2>
+              <p class="text-xs text-slate-500 font-medium">Select any project below to inspect details, repo links, and submit rubric evaluation scores.</p>
             </div>
-            <button onClick={() => setSelectedSub('sub_42')} class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl">
-              Evaluate ➔
-            </button>
+            <span class="px-3 py-1 bg-blue-50 text-blue-700 font-extrabold text-xs rounded-full">
+              {submissionsList.length} Submissions Ready
+            </span>
           </div>
+
+          {loading ? (
+            <div class="p-8 text-center text-xs font-medium text-slate-400">Loading submitted participant projects...</div>
+          ) : submissionsList.length === 0 ? (
+            <div class="p-10 text-center text-xs font-medium text-slate-500 bg-slate-50 rounded-2xl">
+              No participant submissions registered yet.
+            </div>
+          ) : (
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {submissionsList.map(sub => (
+                <div key={sub.id} class="bg-slate-50 hover:bg-slate-100/80 p-6 rounded-3xl border border-slate-200 shadow-2xs transition-all flex flex-col justify-between space-y-4">
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="px-2.5 py-0.5 text-[10px] font-extrabold bg-blue-100 text-blue-800 rounded-md">
+                        {sub.event_name || 'EVENTOS Hackathon'}
+                      </span>
+                      <span class="px-2.5 py-0.5 text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-full">
+                        {sub.status} • {sub.completion_pct}%
+                      </span>
+                    </div>
+
+                    <div>
+                      <h3 class="font-display font-extrabold text-lg text-slate-900 leading-tight">
+                        {sub.title || `Submission ${sub.id}`}
+                      </h3>
+                      <p class="text-xs font-bold text-slate-600 mt-0.5">Team: {sub.team_name || sub.team_id}</p>
+                    </div>
+
+                    {sub.problem_statement && (
+                      <p class="text-xs text-slate-600 line-clamp-2 bg-white p-3 rounded-xl border border-slate-200/80 font-medium">
+                        <strong class="text-slate-800">Problem:</strong> {sub.problem_statement}
+                      </p>
+                    )}
+
+                    {/* Repository & Demo Links */}
+                    <div class="flex flex-wrap gap-2 text-[11px] font-bold">
+                      {sub.repo_url && (
+                        <a href={sub.repo_url} target="_blank" rel="noreferrer" class="px-2.5 py-1 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors flex items-center space-x-1">
+                          <span>📦 GitHub Repo</span>
+                        </a>
+                      )}
+                      {sub.demo_url && (
+                        <a href={sub.demo_url} target="_blank" rel="noreferrer" class="px-2.5 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-1">
+                          <span>🌐 Live Demo</span>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+
+                  <div class="pt-3 border-t border-slate-200/80 flex items-center justify-between">
+                    <span class="text-[11px] text-slate-400 font-medium">Submitted {new Date(sub.submitted_at || Date.now()).toLocaleTimeString()}</span>
+                    <button
+                      onClick={() => handleSelectSubmission(sub)}
+                      class="px-4 py-2 bg-gradient-to-r from-amber-600 to-indigo-600 hover:from-amber-700 hover:to-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all"
+                    >
+                      Evaluate & Score Project ➔
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       ) : (
-        <form onSubmit={handleSubmitScore} class="glass-card rounded-3xl p-6 border border-slate-200 shadow-glass space-y-4">
-          <h2 class="font-display font-bold text-lg text-slate-900">Rubric Scoring — NeuralShift</h2>
-          <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1">Raw Score (0 - 100):</label>
-            <input type="number" min="0" max="100" value={rawScore} onChange={(e) => setRawScore(e.target.value)} class="w-full bg-white border border-slate-200 rounded-xl p-2 text-xs font-bold" />
+        /* SIDE-BY-SIDE EVALUATION & SCORING WORKSPACE */
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-slide-up">
+          {/* Left Column: Submitted Project Inspector */}
+          <div class="lg:col-span-6 bg-white rounded-3xl p-6 border border-slate-200 shadow-2xs space-y-5">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+              <span class="text-xs font-bold text-slate-400 uppercase">Participant Submission Details</span>
+              <button onClick={() => setSelectedSub(null)} class="text-xs font-bold text-blue-600 hover:underline">
+                ← Back to All Submissions
+              </button>
+            </div>
+
+            <div class="space-y-2">
+              <span class="px-2.5 py-0.5 text-[10px] font-extrabold bg-blue-100 text-blue-800 rounded-md">
+                {selectedSub.event_name}
+              </span>
+              <h2 class="font-display font-extrabold text-2xl text-slate-900 leading-tight">
+                {selectedSub.title}
+              </h2>
+              <p class="text-xs font-extrabold text-slate-600">Submitted by {selectedSub.team_name} ({selectedSub.team_id})</p>
+            </div>
+
+            {/* Direct Project Links */}
+            <div class="flex flex-wrap gap-3 pt-1">
+              {selectedSub.repo_url && (
+                <a
+                  href={selectedSub.repo_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  class="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs flex items-center space-x-2"
+                >
+                  <span>📦 Inspect GitHub Codebase</span>
+                  <span>↗</span>
+                </a>
+              )}
+
+              {selectedSub.demo_url && (
+                <a
+                  href={selectedSub.demo_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  class="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs flex items-center space-x-2"
+                >
+                  <span>🌐 Open Live Demo App</span>
+                  <span>↗</span>
+                </a>
+              )}
+            </div>
+
+            <div class="space-y-4 pt-2">
+              <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-1">
+                <span class="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">Problem Statement</span>
+                <p class="text-xs text-slate-800 font-medium leading-relaxed">
+                  {selectedSub.problem_statement || 'No problem statement supplied.'}
+                </p>
+              </div>
+
+              <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-1">
+                <span class="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider">Solution Architecture & Summary</span>
+                <p class="text-xs text-slate-800 font-medium leading-relaxed">
+                  {selectedSub.solution_summary || 'No solution summary supplied.'}
+                </p>
+              </div>
+            </div>
           </div>
-          <div>
-            <label class="block text-xs font-bold text-slate-700 mb-1">Feedback:</label>
-            <textarea rows="3" value={feedback} onChange={(e) => setFeedback(e.target.value)} class="w-full bg-white border border-slate-200 rounded-xl p-2 text-xs" />
+
+          {/* Right Column: Interactive Rubric Scoring Form */}
+          <div class="lg:col-span-6 bg-white rounded-3xl p-6 border border-slate-200 shadow-2xs space-y-6">
+            <div class="border-b border-slate-100 pb-3 flex items-center justify-between">
+              <h2 class="font-display font-extrabold text-xl text-slate-900">Rubric Scoring Sheet</h2>
+              <span class="text-xs font-extrabold text-slate-500">Max Score: 100 pts</span>
+            </div>
+
+            {scoreMsg && (
+              <div class="p-4 bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-bold rounded-2xl animate-slide-up">
+                {scoreMsg}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmitScore} class="space-y-5 text-xs font-semibold">
+              {/* Criterion 1 */}
+              <div class="space-y-1.5 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                <div class="flex justify-between items-center">
+                  <label class="font-bold text-slate-800">🛠️ Technical Complexity (Max 40 pts)</label>
+                  <span class="font-extrabold text-blue-600 text-sm">{techScore} / 40</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="40"
+                  value={techScore}
+                  onChange={(e) => setTechScore(Number(e.target.value))}
+                  class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                />
+              </div>
+
+              {/* Criterion 2 */}
+              <div class="space-y-1.5 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                <div class="flex justify-between items-center">
+                  <label class="font-bold text-slate-800">💡 Innovation & Impact (Max 40 pts)</label>
+                  <span class="font-extrabold text-indigo-600 text-sm">{impactScore} / 40</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="40"
+                  value={impactScore}
+                  onChange={(e) => setImpactScore(Number(e.target.value))}
+                  class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                />
+              </div>
+
+              {/* Criterion 3 */}
+              <div class="space-y-1.5 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+                <div class="flex justify-between items-center">
+                  <label class="font-bold text-slate-800">🎨 UI/UX & Accessibility (Max 20 pts)</label>
+                  <span class="font-extrabold text-purple-600 text-sm">{designScore} / 20</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="20"
+                  value={designScore}
+                  onChange={(e) => setDesignScore(Number(e.target.value))}
+                  class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                />
+              </div>
+
+              {/* Total Aggregate Score Preview */}
+              <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 p-4 rounded-2xl flex items-center justify-between">
+                <span class="font-extrabold text-blue-900 text-sm">Calculated Final Score:</span>
+                <span class="text-2xl font-extrabold text-blue-700">{totalRawScore} <span class="text-xs font-normal text-slate-500">/ 100</span></span>
+              </div>
+
+              {/* Structured Judge Feedback */}
+              <div class="space-y-1">
+                <label class="block font-bold text-slate-800">Structured Judge Feedback</label>
+                <textarea
+                  rows="3"
+                  value={feedback}
+                  onChange={(e) => setFeedback(e.target.value)}
+                  placeholder="Enter constructive feedback for participants..."
+                  class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-medium text-slate-800"
+                ></textarea>
+              </div>
+
+              {/* Form Buttons */}
+              <div class="pt-2 flex space-x-3">
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  class="flex-1 py-3 bg-gradient-to-r from-amber-600 to-indigo-600 hover:from-amber-700 hover:to-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-all"
+                >
+                  {submitting ? 'Submitting Score...' : 'Submit Score & Update Live Leaderboard 🚀'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedSub(null)}
+                  class="px-4 py-3 bg-slate-100 text-slate-700 font-bold text-xs rounded-xl"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
-          <div class="flex space-x-3">
-            <button type="submit" class="flex-1 py-2.5 bg-blue-600 text-white font-bold text-xs rounded-xl">Submit Score</button>
-            <button type="button" onClick={() => setSelectedSub(null)} class="px-4 py-2.5 bg-slate-200 text-slate-700 font-bold text-xs rounded-xl">Cancel</button>
-          </div>
-        </form>
+        </div>
       )}
     </div>
   );
