@@ -1543,6 +1543,7 @@ function OpportunityDetailView({ navigate, isAuthenticated, currentUser, userPro
   const [opportunity, setOpportunity] = useState(null);
   const [isRegistered, setIsRegistered] = useState(false);
   const [registering, setRegistering] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
 
   // Extract ID from hash e.g. #/opportunities/opp_1
@@ -1593,8 +1594,7 @@ function OpportunityDetailView({ navigate, isAuthenticated, currentUser, userPro
       
       if (data.success) {
         setIsRegistered(true);
-        setToastMsg(data.alreadyRegistered ? 'You are already registered for this opportunity!' : 'Successfully registered! Audit record created.');
-        setTimeout(() => setToastMsg(''), 4000);
+        setShowSuccessModal(true);
       }
     } catch (e) {
       console.error(e);
@@ -1784,6 +1784,77 @@ function OpportunityDetailView({ navigate, isAuthenticated, currentUser, userPro
         </div>
 
       </div>
+
+      {/* Registration Success Modal Popup */}
+      {showSuccessModal && (
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-slide-up">
+          <div class="bg-white rounded-3xl p-8 max-w-md w-full border border-slate-200 shadow-2xl space-y-6 text-center animate-scale-in relative overflow-hidden">
+            
+            {/* Background Ambient Glow */}
+            <div class="absolute -top-10 -right-10 w-36 h-36 bg-emerald-400/20 rounded-full blur-2xl pointer-events-none"></div>
+            
+            <button
+              onClick={() => setShowSuccessModal(false)}
+              class="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 font-bold text-sm flex items-center justify-center transition-colors"
+            >
+              ✕
+            </button>
+
+            <div class="w-16 h-16 rounded-3xl bg-gradient-to-tr from-emerald-500 to-teal-500 text-white text-3xl font-extrabold mx-auto flex items-center justify-center shadow-lg shadow-emerald-500/30">
+              🎉
+            </div>
+
+            <div class="space-y-2">
+              <span class="px-3 py-1 bg-emerald-100 text-emerald-800 font-extrabold text-[10px] uppercase rounded-full tracking-wider">
+                Registration Confirmed ✓
+              </span>
+              <h2 class="font-display font-extrabold text-2xl text-slate-900">
+                Registered Successfully!
+              </h2>
+              <p class="text-xs text-slate-600 font-medium">
+                You have officially registered for <strong>{opportunity.title}</strong> hosted by <strong>{opportunity.org_name}</strong>.
+              </p>
+            </div>
+
+            <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 text-left space-y-2 text-xs">
+              <div class="flex justify-between text-slate-500 font-medium">
+                <span>Applicant:</span>
+                <span class="font-bold text-slate-800">{userProfile?.name || currentUser?.displayName || currentUser?.email || 'Authenticated Developer'}</span>
+              </div>
+              <div class="flex justify-between text-slate-500 font-medium">
+                <span>Category:</span>
+                <span class="font-bold text-blue-600">{opportunity.category}</span>
+              </div>
+              <div class="flex justify-between text-slate-500 font-medium">
+                <span>Stipend / Prize:</span>
+                <span class="font-bold text-emerald-600">{opportunity.stipend_or_prize}</span>
+              </div>
+              <div class="flex justify-between text-slate-500 font-medium">
+                <span>Status:</span>
+                <span class="font-extrabold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">Registered ✓</span>
+              </div>
+            </div>
+
+            <div class="space-y-2 pt-2">
+              <button
+                onClick={() => {
+                  setShowSuccessModal(false);
+                  navigate('#/dashboard/my-events');
+                }}
+                class="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold text-xs rounded-2xl shadow-md transition-all active:scale-95"
+              >
+                Go to My Workspace Dashboard ➔
+              </button>
+              <button
+                onClick={() => setShowSuccessModal(false)}
+                class="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-2xl transition-all"
+              >
+                Close & Browse More Opportunities
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
