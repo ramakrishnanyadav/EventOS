@@ -566,7 +566,16 @@ export function seedInitialData(db: DatabaseSync): void {
       ('usr_part_3', 'org_global', 'michael@dev.com', 'Michael Chang', 'PARTICIPANT', '["DevOps", "Kubernetes", "PostgreSQL", "Cloud"]', '${now}'),
       ('usr_judge_1', 'org_global', 'dr.smith@judge.org', 'Dr. Aris Smith', 'JUDGE', '["Machine Learning", "System Architecture"]', '${now}'),
       ('usr_judge_2', 'org_global', 'elena@judge.org', 'Elena Rostova', 'JUDGE', '["Product Design", "Security"]', '${now}'),
-      ('usr_org_1', 'org_global', 'lead@eventos.org', 'Marcus Vance', 'ORGANIZER', '["Operations", "Event Logistics"]', '${now}');
+      ('usr_org_1', 'org_global', 'lead@eventos.org', 'Marcus Vance', 'ORGANIZER', '["Operations", "Event Logistics"]', '${now}'),
+      ('usr_rk_host', 'org_global', 'ramakrishna123@gmail.com', 'Ramakrishna (Host)', 'ORGANIZER', '["Operations", "Event Logistics", "AI/ML"]', '${now}');
+
+    INSERT OR IGNORE INTO user_profiles_v2 (user_id, handle, name, photo_url, institution, bio, enrolled, profile_completed, created_at)
+    VALUES
+      ('usr_rk_host', 'ramakrishna123', 'Ramakrishna (Host)', NULL, 'EVENTOS Host Operations', 'Host & Lead Event Organizer for EVENTOS Global Hackathon.', 1, 1, '${now}');
+
+    INSERT OR IGNORE INTO auth_accounts (user_id, firebase_uid, email, email_verified, providers_json, created_at)
+    VALUES
+      ('usr_rk_host', 'usr_rk_host', 'ramakrishna123@gmail.com', 1, '["email"]', '${now}');
 
     INSERT OR IGNORE INTO user_profiles (user_id, username, college, academic_year, tagline, location, github_username, joined_events_count, wins_count, projects_count, bio)
     VALUES

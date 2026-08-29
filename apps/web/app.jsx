@@ -294,12 +294,11 @@ function MainAppShell() {
     };
   };
 
-  // Switch role context
   const handleUserChange = (userId) => {
     setActiveUserId(userId);
     if (userId.startsWith('usr_part')) setUserRole('PARTICIPANT');
     else if (userId.startsWith('usr_judge')) setUserRole('JUDGE');
-    else if (userId.startsWith('usr_org')) setUserRole('ORGANIZER');
+    else if (userId.startsWith('usr_org') || userId.startsWith('usr_rk_host')) setUserRole('ORGANIZER');
   };
 
   return (

@@ -222,6 +222,55 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', product: 'EVENTOS v4 — An Intelligent Operating System for Live Events', version: '4.0.0' });
 });
 
+// --------------------------------------------------------------------------
+// QR CHECK-IN & ATTENDANCE API
+// --------------------------------------------------------------------------
+app.post('/api/qr/issue', (req, res) => {
+  try {
+    const { eventId, participantId, sessionId, ttlSeconds } = req.body;
+    const pId = participantId || (req.headers['x-user-id'] as string) || 'part_1';
+    const eId = eventId || 'event_hack_2026';
+    const sId = sessionId || 'sess_main';
+    const cred = generateQRCredential(eId, pId, sId, ttlSeconds || 30);
+    res.json(cred);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/qr/public-key', (req, res) => {
+  res.json({ publicKeyPem: getServerPublicKeyPem() });
+});
+
+app.post('/api/qr/verify-offline', (req, res) => {
+  try {
+    const { signedCred } = req.body;
+    if (!signedCred || !signedCred.payload) {
+      return res.status(400).json({ valid: false, message: 'Invalid payload structure' });
+    }
+    const valid = verifyQRCredentialOffline(signedCred);
+    const now = Math.floor(Date.now() / 1000);
+    const expired = now > signedCred.payload.expires_at;
+    res.json({ valid, expired, payload: signedCred.payload });
+  } catch (err: any) {
+    res.status(400).json({ valid: false, error: err.message });
+  }
+});
+
+app.post('/api/qr/checkin', (req, res) => {
+  try {
+    const { signedCred, actorId } = req.body;
+    if (!signedCred || !signedCred.payload) {
+      return res.status(400).json({ success: false, message: 'Invalid payload structure' });
+    }
+    const actor = actorId || (req.headers['x-user-id'] as string) || 'organizer_1';
+    const result = processCheckInSync(signedCred, actor);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // Event Discovery List
 app.get('/api/events', (req, res) => {
   const db = getDb();
