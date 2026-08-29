@@ -1,4 +1,5 @@
 import { getDb } from '../common/db.js';
+import { saveFirestoreProfile } from '../common/firestore.js';
 import crypto from 'node:crypto';
 
 export interface CanonicalSkill {
@@ -544,7 +545,9 @@ export function ensureProfileExists(userId: string, email?: string, name?: strin
     );
   }
 
-  return getFullProfile(userId);
+  const fullProfile = getFullProfile(userId);
+  saveFirestoreProfile(userId, fullProfile).catch(() => {});
+  return fullProfile;
 }
 
 /**
@@ -620,7 +623,9 @@ export function updateUserProfile(userId: string, updates: any): any {
     evaluateAndAwardBadges(userId);
   }
 
-  return getFullProfile(userId);
+  const fullProfile = getFullProfile(userId);
+  saveFirestoreProfile(userId, fullProfile).catch(() => {});
+  return fullProfile;
 }
 
 /**

@@ -32,6 +32,7 @@ import { realtimeServer } from '../../realtime/index.js';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import { saveFirestoreAuthAccount } from '../../modules/common/firestore.js';
 import {
   verifyFirebaseToken,
   linkFirebaseAccount,
@@ -477,6 +478,17 @@ app.post('/api/auth/sync-profile', requireAuth, (req: any, res) => {
     const user = req.user;
     const { name, photoUrl } = req.body;
     const sync = syncUserProfile(user.uid, user.email, name, photoUrl, user.role);
+
+    saveFirestoreAuthAccount(user.uid, {
+      uid: user.uid,
+      email: user.email,
+      name: name || user.email?.split('@')[0] || 'User',
+      photo_url: photoUrl || null,
+      role: user.role || 'PARTICIPANT',
+      profile_completed: Boolean(sync.profile_completed),
+      last_login_at: new Date().toISOString(),
+    }).catch(() => {});
+
     res.json(sync);
   } catch (err: any) {
     res.status(500).json({ error: err.message });

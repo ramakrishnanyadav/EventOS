@@ -13,6 +13,7 @@ import {
   signOut,
   onAuthStateChanged,
 } from 'firebase/auth';
+import { getFirestore, doc, setDoc } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyCb0ImdPWNy3omRb2I-sVXPNOPG9zllxbI",
@@ -27,9 +28,23 @@ const firebaseConfig = {
 
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+export const db = getFirestore(app);
 
 export const googleProvider = new GoogleAuthProvider();
 export const githubProvider = new GithubAuthProvider();
+
+export async function syncClientFirestoreProfile(userId, data) {
+  if (!userId) return;
+  try {
+    await setDoc(doc(db, 'profiles', userId), {
+      uid: userId,
+      ...data,
+      updated_at: new Date().toISOString(),
+    }, { merge: true });
+  } catch (e) {
+    console.warn('Client Firestore Profile sync warning:', e);
+  }
+}
 
 export async function loginWithEmail(email, password) {
   return await signInWithEmailAndPassword(auth, email, password);

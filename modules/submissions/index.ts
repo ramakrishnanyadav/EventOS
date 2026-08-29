@@ -1,6 +1,6 @@
 import { getDb } from '../common/db.js';
 import { emitOutboxEvent } from '../common/outbox.js';
-import { firestoreStore } from '../common/firestore.js';
+import { saveFirestoreSubmission } from '../common/firestore.js';
 
 export interface SubmissionRecord {
   id: string;
@@ -173,19 +173,20 @@ export function saveSubmission(
   }
 
   // Sync to Firestore
-  firestoreStore.saveSubmission({
-    id: targetSubId,
-    eventId,
-    teamId,
-    title,
-    description,
-    githubUrl,
-    demoUrl,
-    completionPct,
-    status: newStatus,
-    submittedAt: isFinal ? now : (existing?.submitted_at || null),
-    updatedAt: now,
-  });
+  try {
+    saveFirestoreSubmission(actorId, eventId, {
+      id: targetSubId,
+      team_id: teamId,
+      title,
+      problem_statement: description,
+      solution_summary: description,
+      repo_url: githubUrl,
+      demo_url: demoUrl,
+      completion_pct: completionPct,
+      status: newStatus,
+      submitted_at: isFinal ? now : (existing?.submitted_at || null),
+    }).catch(() => {});
+  } catch (e) {}
 
   emitOutboxEvent('SUBMISSION_UPDATED', 'Submission', targetSubId, actorId, {
     submission_id: targetSubId,

@@ -1,4 +1,5 @@
 import { getDb } from '../common/db.js';
+import { saveFirestoreRegistration } from '../common/firestore.js';
 
 export interface Opportunity {
   id: string;
@@ -94,6 +95,17 @@ export function registerForOpportunity(
       INSERT INTO opportunity_registrations (id, opportunity_id, user_id, status, created_at)
       VALUES (?, ?, ?, 'REGISTERED', ?)
     `).run(id, opportunityId, userId, now);
+
+    const opp = getOpportunityById(opportunityId);
+    saveFirestoreRegistration(userId, opportunityId, {
+      opportunity_id: opportunityId,
+      kind: 'OPPORTUNITY',
+      title: opp?.title || 'Opportunity',
+      org_name: opp?.org_name || 'EVENTOS',
+      status: 'Registered ✓',
+      cta_route: `#/opportunities/${opportunityId}`,
+      registered_at: now,
+    }).catch(() => {});
 
     return { success: true, alreadyRegistered: false, registration_id: id };
   } catch (err: any) {
