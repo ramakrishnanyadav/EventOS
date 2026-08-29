@@ -6,6 +6,8 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   sendEmailVerification,
   sendPasswordResetEmail,
   signOut,
@@ -42,11 +44,35 @@ export async function registerWithEmail(email, password) {
 }
 
 export async function loginWithGoogle() {
-  return await signInWithPopup(auth, googleProvider);
+  try {
+    return await signInWithPopup(auth, googleProvider);
+  } catch (err) {
+    if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/popup-blocked' || err.code === 'auth/cancelled-popup-request') {
+      console.warn('Popup blocked/closed. Retrying with signInWithRedirect...');
+      return await signInWithRedirect(auth, googleProvider);
+    }
+    throw err;
+  }
 }
 
 export async function loginWithGithub() {
-  return await signInWithPopup(auth, githubProvider);
+  try {
+    return await signInWithPopup(auth, githubProvider);
+  } catch (err) {
+    if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/popup-blocked' || err.code === 'auth/cancelled-popup-request') {
+      console.warn('Popup blocked/closed. Retrying with signInWithRedirect...');
+      return await signInWithRedirect(auth, githubProvider);
+    }
+    throw err;
+  }
+}
+
+export async function checkRedirectResult() {
+  try {
+    return await getRedirectResult(auth);
+  } catch (e) {
+    return null;
+  }
 }
 
 export async function sendVerification(user = auth.currentUser) {
