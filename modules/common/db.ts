@@ -505,6 +505,15 @@ function initSchema(db: DatabaseSync): void {
       FOREIGN KEY (user_id) REFERENCES users(id),
       UNIQUE(user_id, badge_code)
     );
+
+    /* Performance Database Indexes */
+    CREATE INDEX IF NOT EXISTS idx_opportunities_category ON opportunities(category);
+    CREATE INDEX IF NOT EXISTS idx_opportunities_featured ON opportunities(featured);
+    CREATE INDEX IF NOT EXISTS idx_opportunities_work_mode ON opportunities(work_mode);
+    CREATE INDEX IF NOT EXISTS idx_opp_reg_opp_user ON opportunity_registrations(opportunity_id, user_id);
+    CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+    CREATE INDEX IF NOT EXISTS idx_user_profiles_v2_user ON user_profiles_v2(user_id);
+    CREATE INDEX IF NOT EXISTS idx_audit_events_event ON audit_events(event_id, created_at);
   `);
 }
 
