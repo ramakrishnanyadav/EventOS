@@ -48,6 +48,7 @@ const app = express();
 // Security & Middleware Configuration
 app.use(helmet({
   contentSecurityPolicy: false, // Allowed for Vite dev & inline assets
+  crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
 }));
 app.use(cors({
   origin: true,
