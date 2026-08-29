@@ -1398,7 +1398,11 @@ function ProgressiveOnboardingView({ navigate, setHasCompletedOnboarding }) {
 // --------------------------------------------------------------------------
 // 4. PERSONALIZED HOME (#/home)
 // --------------------------------------------------------------------------
-function PersonalizedHomeView({ userProfile, events, navigate }) {
+function PersonalizedHomeView({ events, navigate }) {
+  const { currentUser, userProfile } = useCurrentUser();
+  const name = userProfile?.name || currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Developer';
+  const streak = userProfile?.activity_streak?.current_streak || 0;
+
   return (
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-slide-up">
       <div class="bg-gradient-to-r from-blue-900 to-indigo-900 rounded-3xl p-6 sm:p-10 text-white shadow-xl space-y-4">
@@ -1406,15 +1410,15 @@ function PersonalizedHomeView({ userProfile, events, navigate }) {
           <span class="px-3 py-1 bg-cyan-400/20 text-cyan-300 border border-cyan-400/30 text-xs font-extrabold rounded-full">
             ⚡ PERSONALIZED FEED UNLOCKED
           </span>
-          <span class="text-xs font-bold text-slate-300">Active Streak: 🔥 4 Days</span>
+          <span class="text-xs font-bold text-slate-300">Active Streak: 🔥 {streak} Days</span>
         </div>
 
         <div class="space-y-1">
           <h1 class="font-display font-extrabold text-3xl sm:text-4xl text-white">
-            Welcome back, {userProfile.name}.
+            Welcome back, {name}.
           </h1>
           <p class="text-xs sm:text-sm text-blue-100 font-medium">
-            Your onboarding profile is active. Feed is personalized based on your AI/ML goals and canonical skills.
+            Your onboarding profile is active. Feed is personalized based on your career goals and canonical skills.
           </p>
         </div>
       </div>
