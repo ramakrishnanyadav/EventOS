@@ -9,6 +9,8 @@ import { processUnprocessedOutboxEvents, emitOutboxEvent } from '../../modules/c
 import { generateQRCredential, verifyQRCredentialOffline, processCheckInSync, getServerPublicKeyPem } from '../../modules/attendance/index.js';
 import { handleAssistantQuery } from '../../intelligence/assistant/index.js';
 import { submitJudgeScore } from '../../modules/judging/index.js';
+import { getMyEventEngagements, getParticipantByUserId } from '../../modules/participants/index.js';
+import { getSubmissionById, saveSubmission, updateSubmission } from '../../modules/submissions/index.js';
 import { rebuildLeaderboardProjection, getLeaderboardSnapshot, getUserLeaderboardSnapshot } from '../../modules/ranking/index.js';
 import { getAllVenues } from '../../modules/venues/index.js';
 import { computeTeamCompatibility, computeSimulationOutcome } from '../../intelligence/rules/index.js';
@@ -251,6 +253,54 @@ app.get('/api/people', (req, res) => {
     WHERE u.role = 'PARTICIPANT'
   `).all();
   res.json(people);
+});
+
+// --------------------------------------------------------------------------
+// MY ENGAGEMENTS & SUBMISSIONS API (Multi-Event Submission Portal)
+// --------------------------------------------------------------------------
+app.get('/api/me/events', (req, res) => {
+  try {
+    const userId = (req.query.userId as string) || (req.headers['x-user-id'] as string) || 'usr_part_1';
+    const engagements = getMyEventEngagements(userId);
+    res.json(engagements);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/submissions/:id', (req, res) => {
+  try {
+    const sub = getSubmissionById(req.params.id);
+    if (!sub) return res.status(404).json({ error: 'Submission not found' });
+    res.json(sub);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/submissions/:id', (req, res) => {
+  try {
+    const { eventId, teamId, title, description, githubUrl, demoUrl, completionPct, isFinal, actorId } = req.body;
+    const submissionId = req.params.id;
+    const actor = actorId || 'usr_part_1';
+    
+    const result = saveSubmission(
+      submissionId,
+      eventId || 'event_hack_2026',
+      teamId || `team_${submissionId}`,
+      title || 'Untitled Submission',
+      description || '',
+      githubUrl || '',
+      demoUrl || '',
+      Number(completionPct || 0),
+      Boolean(isFinal),
+      actor
+    );
+
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Developer Profile Endpoint (v1 backward compatible + v2 rich profile with server-side visibility filtering)

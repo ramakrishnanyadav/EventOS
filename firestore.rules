@@ -1,0 +1,38 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // User registrations collection
+    match /registrations/{registrationId} {
+      allow read, write: if request.auth != null && (
+        request.auth.uid == resource.data.userId || 
+        request.auth.uid == request.resource.data.userId ||
+        request.auth.token.role == 'ORGANIZER'
+      );
+    }
+
+    // Teams collection
+    match /teams/{teamId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null;
+    }
+
+    // Team members collection
+    match /teamMembers/{teamMemberId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (
+        request.auth.uid == resource.data.userId || 
+        request.auth.uid == request.resource.data.userId
+      );
+    }
+
+    // Submissions collection
+    match /submissions/{submissionId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (
+        request.resource.data.overrideUnlocked != true || 
+        request.auth.token.role == 'ORGANIZER'
+      );
+    }
+  }
+}
