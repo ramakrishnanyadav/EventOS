@@ -405,49 +405,59 @@ function PublicLandingView({ events, navigate }) {
   };
 
   return (
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-12 animate-slide-up">
+    <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-12 animate-slide-up overflow-hidden">
       
+      {/* Background Ambient Glowing Orbs */}
+      <div class="absolute -top-20 -right-20 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-float pointer-events-none"></div>
+      <div class="absolute top-1/3 -left-20 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl animate-float pointer-events-none" style={{ animationDelay: '3s' }}></div>
+
       {/* Hero Section */}
-      <div class="bg-white rounded-3xl p-8 sm:p-14 border border-slate-200 shadow-2xs space-y-6 text-center sm:text-left">
-        <div class="max-w-3xl space-y-4">
-          <span class="inline-flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">
-            ⚡ Access to {stats.total_users + stats.total_opportunities}+ Active Profiles & Opportunities
-          </span>
+      <div class="relative bg-white/80 backdrop-blur-xl rounded-3xl p-8 sm:p-14 border border-slate-200/90 shadow-xl shadow-blue-500/5 space-y-6 text-center sm:text-left overflow-hidden">
+        <div class="absolute right-0 top-0 w-1/3 h-full bg-gradient-to-l from-blue-50/50 to-transparent pointer-events-none"></div>
+        
+        <div class="max-w-3xl space-y-5 relative z-10">
+          <div class="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-full text-xs font-extrabold bg-gradient-to-r from-blue-50 to-cyan-50 text-blue-800 border border-blue-200/80 shadow-2xs">
+            <span class="relative flex h-2 w-2">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2 w-2 bg-blue-600"></span>
+            </span>
+            <span>⚡ Access to {stats.total_users + stats.total_opportunities}+ Verified Developer Profiles & Opportunities</span>
+          </div>
 
           <h1 class="font-display text-4xl sm:text-6xl font-extrabold tracking-tight text-slate-900 leading-tight">
-            Discover opportunities. Build teams. Compete. Create.
+            Discover opportunities. Build teams. <span class="gradient-text">Compete. Create.</span>
           </h1>
 
-          <p class="text-slate-600 text-base sm:text-lg leading-relaxed font-normal">
-            The intelligent platform for hackathons, developer competitions, tech fests, and live event operations powered by context-aware decision engines.
+          <p class="text-slate-600 text-base sm:text-lg leading-relaxed font-normal max-w-2xl">
+            The intelligent, context-aware operating system for hackathons, developer competitions, tech fests, and live event operations.
           </p>
 
           {/* Primary Search Bar */}
           <div class="flex flex-col sm:flex-row items-center gap-3 pt-2">
-            <div class="relative w-full sm:w-96">
+            <div class="relative w-full sm:w-96 group">
               <input
                 type="text"
                 placeholder="Search opportunities, hackathons, competitions..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') navigate(`#/discover?q=${encodeURIComponent(search)}`); }}
-                class="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                class="w-full pl-10 pr-4 py-3 bg-slate-50/90 border border-slate-200 rounded-2xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all shadow-2xs"
               />
-              <span class="absolute left-3.5 top-3.5 text-slate-400 text-xs">🔍</span>
+              <span class="absolute left-3.5 top-3.5 text-slate-400 text-xs group-focus-within:text-blue-600 transition-colors">🔍</span>
             </div>
 
             <button
               onClick={() => navigate('#/discover')}
-              class="w-full sm:w-auto px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-2xl shadow-md transition-all"
+              class="w-full sm:w-auto px-7 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-extrabold text-xs rounded-2xl shadow-md shadow-blue-500/20 hover:shadow-lg transition-all active:scale-95"
             >
               Explore Opportunities ➔
             </button>
 
             <button
               onClick={() => navigate('#/register')}
-              class="w-full sm:w-auto px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-2xl transition-all"
+              class="w-full sm:w-auto px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-2xl transition-all active:scale-95"
             >
-              Create Your Profile
+              Create Profile
             </button>
           </div>
         </div>
@@ -455,7 +465,13 @@ function PublicLandingView({ events, navigate }) {
 
       {/* Unstop Category Icon Strip */}
       <div class="space-y-4">
-        <h2 class="font-display font-extrabold text-xl text-slate-900">Explore Opportunities</h2>
+        <div class="flex items-center justify-between">
+          <h2 class="font-display font-extrabold text-xl text-slate-900 flex items-center space-x-2">
+            <span>🎯 Explore Opportunities</span>
+          </h2>
+          <span class="text-xs font-bold text-slate-400">7 Active Categories</span>
+        </div>
+
         <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
           {[
             { title: 'Internships', val: 'INTERNSHIP', icon: '💼', count: '4 Active' },
@@ -469,11 +485,11 @@ function PublicLandingView({ events, navigate }) {
             <div
               key={idx}
               onClick={() => navigate(`#/discover?category=${cat.val}`)}
-              class="bg-white hover:bg-blue-50/60 p-4 rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-md transition-all cursor-pointer text-center space-y-2 group"
+              class="card-hover-lift bg-white/90 hover:bg-blue-50/70 p-4 rounded-2xl border border-slate-200/80 hover:border-blue-300 shadow-2xs cursor-pointer text-center space-y-2 group transition-all"
             >
-              <div class="text-3xl">{cat.icon}</div>
+              <div class="text-3xl transform group-hover:scale-110 transition-transform">{cat.icon}</div>
               <h3 class="font-bold text-slate-900 text-xs group-hover:text-blue-600 transition-colors line-clamp-1">{cat.title}</h3>
-              <span class="inline-block text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{cat.count}</span>
+              <span class="inline-block text-[10px] font-extrabold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">{cat.count}</span>
             </div>
           ))}
         </div>
@@ -488,10 +504,10 @@ function PublicLandingView({ events, navigate }) {
           </div>
 
           <div class="flex items-center space-x-2">
-            <button onClick={() => scrollCarousel('left')} class="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-all font-bold shadow-2xs">
+            <button onClick={() => scrollCarousel('left')} class="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-all font-bold shadow-2xs active:scale-95">
               ←
             </button>
-            <button onClick={() => scrollCarousel('right')} class="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-all font-bold shadow-2xs">
+            <button onClick={() => scrollCarousel('right')} class="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-all font-bold shadow-2xs active:scale-95">
               →
             </button>
           </div>
@@ -502,14 +518,14 @@ function PublicLandingView({ events, navigate }) {
             <div
               key={opp.id}
               onClick={() => navigate(`#/opportunities/${opp.id}`)}
-              class="min-w-[320px] max-w-[340px] bg-white rounded-3xl p-6 border border-slate-200/90 shadow-2xs hover:shadow-lg transition-all cursor-pointer flex flex-col justify-between space-y-4 snap-start group"
+              class="card-hover-lift min-w-[320px] max-w-[340px] bg-white rounded-3xl p-6 border border-slate-200/90 shadow-2xs cursor-pointer flex flex-col justify-between space-y-4 snap-start group"
             >
               <div class="space-y-3">
                 <div class="flex items-center justify-between">
                   <span class="px-2.5 py-0.5 text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200 rounded-full">
                     {opp.category}
                   </span>
-                  <span class="px-2 py-0.5 text-[10px] font-extrabold bg-amber-100 text-amber-900 rounded-md">
+                  <span class="px-2 py-0.5 text-[10px] font-extrabold bg-amber-100 text-amber-900 rounded-md shadow-2xs">
                     FEATURED ⭐
                   </span>
                 </div>
@@ -520,7 +536,7 @@ function PublicLandingView({ events, navigate }) {
               </div>
 
               <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                <span class="font-bold text-emerald-600">{opp.stipend_or_prize}</span>
+                <span class="font-extrabold text-emerald-600">{opp.stipend_or_prize}</span>
                 <span class="text-slate-400 font-medium">Closes {opp.deadline}</span>
               </div>
             </div>
@@ -530,6 +546,7 @@ function PublicLandingView({ events, navigate }) {
     </div>
   );
 }
+
 
 
 // --------------------------------------------------------------------------
