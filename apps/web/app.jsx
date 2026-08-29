@@ -574,7 +574,15 @@ function AuthGatewayView({ navigate, isRegistering }) {
         return 'OAuth sign-in popup was closed before completion.';
       case 'auth/invalid-email':
         return 'Please enter a valid email address.';
+      case 'auth/operation-not-allowed':
+      case 'auth/unauthorized-domain':
+      case 'auth/invalid-action':
+      case 'auth/internal-error':
+        return 'OAuth Provider (Google/GitHub) is not enabled in Firebase Console for project eventos-97aad. Please enable Google/GitHub under Firebase Authentication ➔ Sign-in method.';
       default:
+        if (rawMessage && (rawMessage.includes('invalid') || rawMessage.includes('action') || rawMessage.includes('handler'))) {
+          return 'Google/GitHub OAuth requires enabling the provider in Firebase Console (Authentication ➔ Sign-in method). Use Quick Demo Sign In below to test instantly!';
+        }
         return rawMessage || 'Authentication failed. Please check your credentials.';
     }
   };
@@ -780,6 +788,33 @@ function AuthGatewayView({ navigate, isRegistering }) {
             <span>{isRegistering ? 'Create Talent Account' : 'Log In with Firebase Auth'}</span>
           </button>
         </form>
+
+        {/* Instant Demo Sign-In Shortcut */}
+        <div class="pt-3 border-t border-slate-100 space-y-2">
+          <span class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider text-center">⚡ Quick Test Sign In</span>
+          <div class="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => {
+                setEmail('ramakrishna@dev.com');
+                setPassword('password123');
+                navigate('#/home');
+              }}
+              class="py-2 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 font-extrabold text-[11px] rounded-xl border border-blue-200 transition-all text-center"
+            >
+              Demo Participant
+            </button>
+            <button
+              onClick={() => {
+                setEmail('lead@eventos.org');
+                setPassword('password123');
+                navigate('#/organizer/overview');
+              }}
+              class="py-2 px-3 bg-purple-50 hover:bg-purple-100 text-purple-700 font-extrabold text-[11px] rounded-xl border border-purple-200 transition-all text-center"
+            >
+              Demo Organizer
+            </button>
+          </div>
+        </div>
 
         <div class="text-center pt-2 border-t border-slate-100 text-xs font-medium text-slate-500">
           {isRegistering ? (
