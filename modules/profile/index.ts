@@ -501,6 +501,129 @@ export function getFullProfile(handleOrUserId: string): any {
 }
 
 /**
+ * Ensure user and profile rows exist with honest initial defaults
+ */
+export function ensureProfileExists(userId: string, email?: string, name?: string): any {
+  const db = getDb();
+  
+  let user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as any;
+  if (!user) {
+    const userEmail = email || `${userId}@dev.com`;
+    const userName = name || 'New Developer';
+    db.prepare('INSERT OR IGNORE INTO users (id, org_id, email, name, role, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(
+      userId,
+      'org_eventos',
+      userEmail,
+      userName,
+      'PARTICIPANT',
+      new Date().toISOString()
+    );
+  }
+
+  let prof = db.prepare('SELECT * FROM user_profiles_v2 WHERE user_id = ?').get(userId) as any;
+  if (!prof) {
+    const baseName = name || email?.split('@')[0] || 'New Developer';
+    const handle = baseName.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/^_+|_+$/g, '') || `user_${userId.slice(0, 8)}`;
+    let finalHandle = handle;
+    const existingHandle = db.prepare('SELECT handle FROM user_profiles_v2 WHERE handle = ?').get(finalHandle);
+    if (existingHandle) {
+      finalHandle = `${handle}_${Math.floor(Math.random() * 1000)}`;
+    }
+
+    db.prepare(`
+      INSERT INTO user_profiles_v2 (user_id, handle, name, photo_url, institution, bio, enrolled, profile_completed, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, 1, 0, ?)
+    `).run(
+      userId,
+      finalHandle,
+      baseName,
+      null,
+      'Not set yet',
+      '',
+      new Date().toISOString()
+    );
+  }
+
+  return getFullProfile(userId);
+}
+
+/**
+ * Partial profile updater for onboarding and profile editing
+ */
+export function updateUserProfile(userId: string, updates: any): any {
+  const db = getDb();
+  ensureProfileExists(userId);
+
+  if (updates.name !== undefined || updates.handle !== undefined || updates.bio !== undefined || updates.photo_url !== undefined || updates.institution !== undefined) {
+    const current = db.prepare('SELECT * FROM user_profiles_v2 WHERE user_id = ?').get(userId) as any;
+    const name = updates.name !== undefined ? updates.name : (current?.name || 'New Developer');
+    let handle = current?.handle || `user_${userId.slice(0, 8)}`;
+    if (updates.handle && updates.handle !== current?.handle) {
+      const cleanHandle = updates.handle.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      const collision = db.prepare('SELECT user_id FROM user_profiles_v2 WHERE handle = ? AND user_id != ?').get(cleanHandle, userId);
+      if (!collision) {
+        handle = cleanHandle;
+      }
+    }
+    const bio = updates.bio !== undefined ? updates.bio : (current?.bio || '');
+    const photo_url = updates.photo_url !== undefined ? updates.photo_url : (current?.photo_url || null);
+    const institution = updates.institution !== undefined ? updates.institution : (current?.institution || 'Not set yet');
+
+    db.prepare(`
+      UPDATE user_profiles_v2
+      SET name = ?, handle = ?, bio = ?, photo_url = ?, institution = ?
+      WHERE user_id = ?
+    `).run(name, handle, bio, photo_url, institution, userId);
+  }
+
+  if (updates.institution || updates.degree || updates.field) {
+    const eduId = `edu_${userId}_1`;
+    db.prepare(`
+      INSERT INTO user_education (id, user_id, degree, field, institution, start_date, still_enrolled)
+      VALUES (?, ?, ?, ?, ?, ?, 1)
+      ON CONFLICT(id) DO UPDATE SET
+        degree = excluded.degree,
+        field = excluded.field,
+        institution = excluded.institution
+    `).run(
+      eduId,
+      userId,
+      updates.degree || 'Bachelor of Science',
+      updates.field || 'Computer Science',
+      updates.institution || 'Not set yet',
+      new Date().toISOString().split('T')[0]
+    );
+
+    if (updates.institution) {
+      db.prepare('UPDATE user_profiles_v2 SET institution = ? WHERE user_id = ?').run(updates.institution, userId);
+    }
+  }
+
+  if (Array.isArray(updates.skills)) {
+    db.prepare('DELETE FROM user_canonical_skills WHERE user_id = ?').run(userId);
+    for (const rawSkill of updates.skills) {
+      const canonical = canonicalizeSkill(rawSkill);
+      db.prepare(`
+        INSERT OR IGNORE INTO user_canonical_skills (user_id, canonical_id, display_name)
+        VALUES (?, ?, ?)
+      `).run(userId, canonical.canonical_id, canonical.display_name);
+    }
+  }
+
+  if (updates.career_goals || updates.goals) {
+    const goalsObj = updates.career_goals || updates.goals;
+    const goalsJson = typeof goalsObj === 'string' ? goalsObj : JSON.stringify(goalsObj);
+    db.prepare('UPDATE user_profiles_v2 SET career_goals_json = ?, profile_completed = 1 WHERE user_id = ?').run(
+      goalsJson,
+      userId
+    );
+    evaluateAndAwardBadges(userId);
+  }
+
+  return getFullProfile(userId);
+}
+
+/**
  * Server-side Field-Level Visibility Filter
  * Public viewers NEVER receive private fields like resume_url, contact details, or detailed CGPA.
  */

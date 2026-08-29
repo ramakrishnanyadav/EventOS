@@ -46,6 +46,8 @@ import {
   getUserBadges,
   getGlobalUserRank,
   syncUserProfile,
+  ensureProfileExists,
+  updateUserProfile,
 } from '../../modules/profile/index.js';
 import {
   getPersonalizedFeed,
@@ -383,6 +385,49 @@ app.post('/api/events/:eventId/submissions/mine', (req, res) => {
     res.json(result);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Helper function to resolve current user identity from Firebase Bearer Token or Identity headers
+async function resolveUserFromReq(req: express.Request): Promise<{ uid: string; email: string }> {
+  const authHeader = req.headers.authorization;
+  if (authHeader) {
+    try {
+      const verified = await verifyFirebaseToken(authHeader);
+      if (verified && verified.uid) {
+        return { uid: verified.uid, email: verified.email };
+      }
+    } catch (e) {}
+  }
+
+  const userIdHeader = (req.headers['x-user-id'] as string) || (req.query.userId as string) || req.body?.userId;
+  if (userIdHeader) {
+    return { uid: userIdHeader, email: `${userIdHeader}@dev.com` };
+  }
+
+  throw new Error('401 Unauthorized: Valid authentication token or user identity header required');
+}
+
+// --------------------------------------------------------------------------
+// SINGLE SOURCE OF TRUTH IDENTITY ENDPOINTS (GET /api/profile/me & PATCH /api/profile/me)
+// --------------------------------------------------------------------------
+app.get('/api/profile/me', async (req, res) => {
+  try {
+    const user = await resolveUserFromReq(req);
+    const profile = ensureProfileExists(user.uid, user.email);
+    res.json(profile);
+  } catch (err: any) {
+    res.status(err.message.includes('401') ? 401 : 500).json({ error: err.message });
+  }
+});
+
+app.patch('/api/profile/me', async (req, res) => {
+  try {
+    const user = await resolveUserFromReq(req);
+    const updated = updateUserProfile(user.uid, req.body);
+    res.json(updated);
+  } catch (err: any) {
+    res.status(err.message.includes('401') ? 401 : 500).json({ error: err.message });
   }
 });
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, createContext, useContext } from 'react';
 import {
   auth,
   onAuthStateChanged,
@@ -13,6 +13,94 @@ import {
 } from './src/firebase.js';
 
 const DEFAULT_EVENT_ID = 'event_hack_2026';
+
+// --------------------------------------------------------------------------
+// SINGLE SOURCE OF TRUTH FOR USER IDENTITY (CurrentUserContext)
+// --------------------------------------------------------------------------
+const CurrentUserContext = createContext({
+  currentUser: null,
+  userProfile: null,
+  isLoading: true,
+  refetchProfile: async () => {},
+  updateProfileState: () => {},
+});
+
+export function CurrentUserProvider({ children }) {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchProfile = async (user) => {
+    if (!user) {
+      setUserProfile(null);
+      setIsLoading(false);
+      return;
+    }
+    try {
+      setIsLoading(true);
+      const idToken = await user.getIdToken().catch(() => '');
+      const headers = { 'x-user-id': user.uid };
+      if (idToken) headers['Authorization'] = `Bearer ${idToken}`;
+
+      const res = await fetch('/api/profile/me', { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setUserProfile(data);
+      }
+    } catch (e) {
+      console.error('Error fetching identity profile:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setCurrentUser(user);
+      if (user) {
+        await fetchProfile(user);
+      } else {
+        setUserProfile(null);
+        setIsLoading(false);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const refetchProfile = async () => {
+    if (currentUser) {
+      await fetchProfile(currentUser);
+    }
+  };
+
+  const updateProfileState = (partial) => {
+    setUserProfile(prev => prev ? { ...prev, ...partial } : partial);
+  };
+
+  return (
+    <CurrentUserContext.Provider value={{
+      currentUser,
+      userProfile,
+      isLoading,
+      refetchProfile,
+      updateProfileState,
+    }}>
+      {children}
+    </CurrentUserContext.Provider>
+  );
+}
+
+export function useCurrentUser() {
+  return useContext(CurrentUserContext);
+}
+
+export function getInitials(name) {
+  if (!name || typeof name !== 'string') return 'U';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 0 || !parts[0]) return 'U';
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
 // Client-Side Hash Router Hook
 function useHashRoute() {
@@ -31,12 +119,12 @@ function useHashRoute() {
   return [route, navigate];
 }
 
-function App() {
+function MainAppShell() {
   const [route, navigate] = useHashRoute();
+  const { currentUser, userProfile, isLoading: contextLoading } = useCurrentUser();
   
   // Real Firebase Authentication & Persona State
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
   const [activeUserId, setActiveUserId] = useState('');
   const [userRole, setUserRole] = useState('PARTICIPANT');
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(true);
@@ -54,20 +142,22 @@ function App() {
   const [auditLog, setAuditLog] = useState([]);
   const [orgs, setOrgs] = useState([]);
   const [people, setPeople] = useState([]);
-  const [userProfile, setUserProfile] = useState({
-    name: 'Developer Profile',
-    username: 'developer',
-    college: 'Engineering Institute',
-    academicYear: 'Undergraduate',
-    tagline: 'Building software on EVENTOS.',
-    location: 'Remote',
-    skills: ['React', 'TypeScript', 'Node.js'],
-    interests: ['AI/ML', 'Web Development'],
-    githubUsername: '',
-    joinedEventsCount: 0,
-    winsCount: 0,
-    projectsCount: 0,
-  });
+
+  // Sync authentication state from CurrentUserContext
+  useEffect(() => {
+    if (currentUser) {
+      setIsAuthenticated(true);
+      setActiveUserId(currentUser.uid);
+      if (userProfile) {
+        setUserRole(userProfile.role || 'PARTICIPANT');
+        setHasCompletedOnboarding(Boolean(userProfile.profile_completed));
+      }
+    } else {
+      setIsAuthenticated(false);
+      setActiveUserId('');
+      setUserRole('PARTICIPANT');
+    }
+  }, [currentUser, userProfile]);
 
   // Listen for real Firebase auth state changes
   useEffect(() => {
@@ -967,51 +1057,108 @@ function PersonalizationModal({ isOpen, onClose, currentUser, navigate }) {
 // --------------------------------------------------------------------------
 // 3. PROGRESSIVE ONBOARDING WIZARD (#/onboarding) — Gated required steps
 // --------------------------------------------------------------------------
-function ProgressiveOnboardingView({ userProfile, setUserProfile, navigate, setHasCompletedOnboarding }) {
+// --------------------------------------------------------------------------
+// 3. PROGRESSIVE ONBOARDING WIZARD (#/onboarding) — Gated required steps
+// --------------------------------------------------------------------------
+function ProgressiveOnboardingView({ navigate, setHasCompletedOnboarding }) {
+  const { currentUser, userProfile, refetchProfile } = useCurrentUser();
   const [step, setStep] = useState(1);
-  const [handle, setHandle] = useState('ramakrishna');
+  const [name, setName] = useState('');
+  const [handle, setHandle] = useState('');
   const [handleAvailable, setHandleAvailable] = useState(true);
-  const [institution, setInstitution] = useState('National Institute of Technology');
-  const [degree, setDegree] = useState('Master of Computer Applications');
-  const [field, setField] = useState('Computer Science & AI');
-  const [selectedSkills, setSelectedSkills] = useState(['React', 'TypeScript', 'Node.js', 'AI / ML']);
-  const [customSkillInput, setCustomSkillInput] = useState('');
+  const [institution, setInstitution] = useState('');
+  const [degree, setDegree] = useState('Bachelor of Science');
+  const [field, setField] = useState('Computer Science');
+  const [selectedSkills, setSelectedSkills] = useState([]);
   const [fieldOfInterest, setFieldOfInterest] = useState('AI/ML');
-  const [preferredLocation, setPreferredLocation] = useState('San Francisco / Remote');
+  const [preferredLocation, setPreferredLocation] = useState('Remote');
   const [resumeSignedUrl, setResumeSignedUrl] = useState('');
   const [resumeSuggestions, setResumeSuggestions] = useState(null);
+  const [stepSaving, setStepSaving] = useState(false);
+  const [stepError, setStepError] = useState('');
+
+  useEffect(() => {
+    if (userProfile) {
+      setName(userProfile.name || currentUser?.displayName || '');
+      setHandle(userProfile.handle || currentUser?.email?.split('@')[0] || '');
+      setInstitution(userProfile.institution || '');
+      if (Array.isArray(userProfile.skills)) {
+        setSelectedSkills(userProfile.skills.map((s) => s.display_name || s.canonical_id));
+      }
+    } else if (currentUser) {
+      setName(currentUser.displayName || '');
+      setHandle(currentUser.email?.split('@')[0] || '');
+    }
+  }, [userProfile, currentUser]);
 
   // Live handle availability checker
   useEffect(() => {
     if (!handle) return;
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`/api/onboarding/check-handle?handle=${handle}&userId=usr_part_1`);
+        const userId = currentUser?.uid || '';
+        const res = await fetch(`/api/onboarding/check-handle?handle=${handle}&userId=${userId}`);
         const data = await res.json();
         setHandleAvailable(data.available);
       } catch (e) {}
     }, 250);
     return () => clearTimeout(timer);
-  }, [handle]);
+  }, [handle, currentUser]);
 
   const handleAddSkill = (skillName) => {
     if (!selectedSkills.includes(skillName)) {
       setSelectedSkills([...selectedSkills, skillName]);
+    } else {
+      setSelectedSkills(selectedSkills.filter(s => s !== skillName));
     }
   };
 
-  const handleSaveStep = async (stepName, payload) => {
+  const handleSaveStep = async (stepPayload) => {
+    setStepError('');
+    setStepSaving(true);
     try {
-      const res = await fetch('/api/onboarding/step', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: 'usr_part_1', step: stepName, payload }),
+      const idToken = currentUser ? await currentUser.getIdToken().catch(() => '') : '';
+      const headers = { 'Content-Type': 'application/json' };
+      if (idToken) headers['Authorization'] = `Bearer ${idToken}`;
+      if (currentUser?.uid) headers['x-user-id'] = currentUser.uid;
+
+      const res = await fetch('/api/profile/me', {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(stepPayload),
       });
+
       const data = await res.json();
-      return data;
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to save onboarding step');
+      }
+
+      await refetchProfile();
+      return true;
     } catch (e) {
-      alert(e.message);
-      return null;
+      setStepError(e.message || 'Error saving onboarding data');
+      return false;
+    } finally {
+      setStepSaving(false);
+    }
+  };
+
+  const handleNextStep = async () => {
+    let success = false;
+    if (step === 1) {
+      if (!name.trim()) { setStepError('Full Name is required'); return; }
+      if (!handleAvailable) { setStepError('Handle is unavailable'); return; }
+      success = await handleSaveStep({ name, handle, institution });
+    } else if (step === 2) {
+      success = await handleSaveStep({ institution, degree, field });
+    } else if (step === 3) {
+      success = await handleSaveStep({ skills: selectedSkills });
+    } else if (step === 4) {
+      success = await handleSaveStep({ goals: { field_of_interest: fieldOfInterest, preferred_location: preferredLocation } });
+    }
+
+    if (success) {
+      setStep(step + 1);
     }
   };
 
@@ -1020,20 +1167,25 @@ function ProgressiveOnboardingView({ userProfile, setUserProfile, navigate, setH
     if (!file) return;
 
     if (!file.name.endsWith('.pdf')) {
-      alert('Security Policy Error: Only PDF files are allowlisted.');
+      setStepError('Security Policy Error: Only PDF files are allowlisted.');
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      alert('Security Policy Error: File size exceeds 10MB cap.');
+      setStepError('Security Policy Error: File size exceeds 10MB cap.');
       return;
     }
 
     try {
+      const idToken = currentUser ? await currentUser.getIdToken().catch(() => '') : '';
+      const headers = { 'Content-Type': 'application/json' };
+      if (idToken) headers['Authorization'] = `Bearer ${idToken}`;
+      if (currentUser?.uid) headers['x-user-id'] = currentUser.uid;
+
       const res = await fetch('/api/profile/resume', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
-          userId: 'usr_part_1',
+          userId: currentUser?.uid || '',
           filename: file.name,
           fileType: file.type || 'application/pdf',
           sizeBytes: file.size,
@@ -1042,13 +1194,15 @@ function ProgressiveOnboardingView({ userProfile, setUserProfile, navigate, setH
       const data = await res.json();
       setResumeSignedUrl(data.signed_url);
       setResumeSuggestions(data.suggestions);
-    } catch (err) { alert(err.message); }
+    } catch (err) { setStepError(err.message); }
   };
 
   const handleFinish = async () => {
-    await handleSaveStep('goals', { field_of_interest: fieldOfInterest, preferred_location: preferredLocation });
-    setHasCompletedOnboarding(true);
-    navigate('#/home');
+    const success = await handleSaveStep({ goals: { field_of_interest: fieldOfInterest, preferred_location: preferredLocation } });
+    if (success) {
+      if (setHasCompletedOnboarding) setHasCompletedOnboarding(true);
+      navigate('#/home');
+    }
   };
 
   return (
@@ -1064,12 +1218,18 @@ function ProgressiveOnboardingView({ userProfile, setUserProfile, navigate, setH
       </div>
 
       <div class="bg-white rounded-3xl p-8 border border-slate-200 shadow-xl space-y-6">
+        {stepError && (
+          <div class="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs font-bold animate-slide-up">
+            ✕ {stepError}
+          </div>
+        )}
+
         {step === 1 && (
           <div class="space-y-4">
             <h2 class="font-display font-extrabold text-xl text-slate-900">Step 1 — Identity (Required)</h2>
             <div>
               <label class="block text-xs font-bold text-slate-700 mb-1">Full Name</label>
-              <input type="text" value={userProfile.name} onChange={(e) => setUserProfile({ ...userProfile, name: e.target.value })} class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-semibold" />
+              <input type="text" value={name} onChange={(e) => setName(e.target.value)} class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-semibold" />
             </div>
             <div>
               <div class="flex justify-between items-center mb-1">
@@ -1162,7 +1322,7 @@ function ProgressiveOnboardingView({ userProfile, setUserProfile, navigate, setH
                     <span key={sk} class="px-2 py-0.5 bg-blue-100 text-blue-800 font-bold rounded">{sk}</span>
                   ))}
                 </div>
-                <button onClick={() => alert('Suggestions confirmed and merged!')} class="px-3 py-1 bg-blue-600 text-white font-bold text-[11px] rounded-lg mt-1">
+                <button onClick={() => setStepError('Suggestions confirmed and merged!')} class="px-3 py-1 bg-blue-600 text-white font-bold text-[11px] rounded-lg mt-1">
                   Confirm Suggestions ✓
                 </button>
               </div>
@@ -1171,17 +1331,17 @@ function ProgressiveOnboardingView({ userProfile, setUserProfile, navigate, setH
         )}
 
         <div class="pt-4 border-t border-slate-100 flex justify-between">
-          <button disabled={step === 1} onClick={() => setStep(step - 1)} class="px-4 py-2 bg-slate-100 disabled:opacity-40 text-slate-700 font-bold text-xs rounded-xl">
+          <button disabled={step === 1 || stepSaving} onClick={() => setStep(step - 1)} class="px-4 py-2 bg-slate-100 disabled:opacity-40 text-slate-700 font-bold text-xs rounded-xl">
             Previous
           </button>
           
           {step < 5 ? (
-            <button onClick={() => setStep(step + 1)} class="px-5 py-2 bg-blue-600 text-white font-bold text-xs rounded-xl shadow-sm">
-              Next Step ➔
+            <button onClick={handleNextStep} disabled={stepSaving} class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-sm">
+              {stepSaving ? 'Saving...' : 'Next Step ➔'}
             </button>
           ) : (
-            <button onClick={handleFinish} class="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md">
-              Complete Onboarding & Unlock Feed ✓
+            <button onClick={handleFinish} disabled={stepSaving} class="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md">
+              {stepSaving ? 'Finalizing...' : 'Complete Onboarding & Unlock Feed ✓'}
             </button>
           )}
         </div>
@@ -1239,12 +1399,18 @@ function PersonalizedHomeView({ userProfile, events, navigate }) {
 // 5. PERSONALIZED OPPORTUNITY DISCOVERY ENGINE (#/discover) — Unstop Style
 // --------------------------------------------------------------------------
 function DiscoverView({ events, navigate, route = '#/discover' }) {
+  const { currentUser, userProfile } = useCurrentUser();
   const [opportunities, setOpportunities] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [workModeFilter, setWorkModeFilter] = useState('ALL');
   const [sortBy, setSortBy] = useState('RELEVANCE');
-  const [currentPersona, setCurrentPersona] = useState('usr_part_1');
+  const activeUserId = currentUser?.uid || '';
+  const [currentPersona, setCurrentPersona] = useState(activeUserId || 'user_session');
+
+  useEffect(() => {
+    if (activeUserId) setCurrentPersona(activeUserId);
+  }, [activeUserId]);
 
   useEffect(() => {
     // Parse category from URL query param if present e.g. #/discover?category=INTERNSHIP
@@ -1264,7 +1430,12 @@ function DiscoverView({ events, navigate, route = '#/discover' }) {
 
   const fetchFeed = async () => {
     try {
-      const res = await fetch(`/api/discovery/feed?userId=${currentPersona}&category=${selectedCategory}`);
+      const idToken = currentUser ? await currentUser.getIdToken().catch(() => '') : '';
+      const headers = {};
+      if (idToken) headers['Authorization'] = `Bearer ${idToken}`;
+      if (currentPersona) headers['x-user-id'] = currentPersona;
+
+      const res = await fetch(`/api/discovery/feed?userId=${currentPersona}&category=${selectedCategory}`, { headers });
       const data = await res.json();
       setOpportunities(data || []);
     } catch (e) { console.error(e); }
@@ -1322,7 +1493,9 @@ function DiscoverView({ events, navigate, route = '#/discover' }) {
             onChange={(e) => setCurrentPersona(e.target.value)}
             class="bg-white border border-blue-300 font-bold text-slate-800 rounded-xl px-2.5 py-1.5 focus:outline-none"
           >
-            <option value="usr_part_1">Ramakrishna (AI/ML & React Specialist)</option>
+            <option value={activeUserId || 'current_user'}>
+              {userProfile?.name || currentUser?.displayName || currentUser?.email || 'Current Logged-in User'}
+            </option>
             <option value="usr_part_2">Sarah (Python & ML Researcher)</option>
             <option value="usr_part_3">Michael (DevOps & Cloud Engineer)</option>
           </select>
@@ -1591,7 +1764,7 @@ function OpportunityDetailView({ navigate, isAuthenticated, currentUser, userPro
       await fetch(`/api/opportunities/${oppId}/register`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ userId: currentUser?.uid || 'usr_part_1' })
+        body: JSON.stringify({ userId: currentUser?.uid || '' })
       });
     } catch (e) {
       console.error(e);
@@ -1991,25 +2164,65 @@ function PublicLeaderboardView({ leaderboard, sequenceNumber }) {
 // --------------------------------------------------------------------------
 // 8. DEVELOPER PROFILE VIEW (#/profile) — Rich Data Model & Achievements
 // --------------------------------------------------------------------------
-function DeveloperProfileView({ userProfile, navigate }) {
+function DeveloperProfileView({ navigate }) {
+  const { currentUser, userProfile: contextProfile, isLoading: contextLoading, refetchProfile } = useCurrentUser();
   const [profileData, setProfileData] = useState(null);
   const [showFullBio, setShowFullBio] = useState(false);
 
   useEffect(() => {
-    fetchProfile();
-  }, []);
+    if (contextProfile) {
+      setProfileData(contextProfile);
+    } else if (currentUser) {
+      loadProfileFromApi();
+    }
+  }, [contextProfile, currentUser]);
 
-  const fetchProfile = async () => {
+  const loadProfileFromApi = async () => {
+    if (!currentUser) return;
     try {
-      const res = await fetch('/api/profile/usr_part_1', {
-        headers: { 'x-user-id': 'usr_part_1' },
-      });
-      const data = await res.json();
-      setProfileData(data);
-    } catch (e) { console.error(e); }
+      const idToken = await currentUser.getIdToken().catch(() => '');
+      const headers = { 'x-user-id': currentUser.uid };
+      if (idToken) headers['Authorization'] = `Bearer ${idToken}`;
+
+      const res = await fetch('/api/profile/me', { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setProfileData(data);
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
-  if (!profileData) return <div class="p-12 text-center text-slate-400 font-medium">Loading developer profile...</div>;
+  const activeProfile = profileData || contextProfile;
+
+  if (contextLoading && !activeProfile) {
+    return <div class="p-12 text-center text-slate-400 font-medium">Loading developer profile...</div>;
+  }
+
+  if (!activeProfile && !currentUser) {
+    return (
+      <div class="max-w-md mx-auto my-12 p-8 bg-white rounded-3xl border border-slate-200 text-center space-y-4 shadow-xl">
+        <div class="text-4xl">👤</div>
+        <h2 class="font-display font-extrabold text-xl text-slate-900">Log In to View Profile</h2>
+        <p class="text-xs text-slate-500 font-medium">Please sign in to access your talent profile, achievements, and skills.</p>
+        <button onClick={() => navigate('#/login')} class="px-5 py-2.5 bg-blue-600 text-white font-bold text-xs rounded-xl shadow-md">
+          Log In ➔
+        </button>
+      </div>
+    );
+  }
+
+  const name = activeProfile?.name || currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Developer';
+  const handle = activeProfile?.handle || currentUser?.email?.split('@')[0] || 'user';
+  const institution = activeProfile?.institution || 'Not set yet';
+  const bio = activeProfile?.bio || 'No bio added yet.';
+  const initials = getInitials(name);
+
+  const streak = activeProfile?.activity_streak?.current_streak || 0;
+  const maxStreak = activeProfile?.activity_streak?.max_streak || 0;
+  const rank = activeProfile?.gamification?.global_rank ? `Rank #${activeProfile.gamification.global_rank}` : 'Unranked';
+  const points = activeProfile?.gamification?.total_points || 0;
 
   return (
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-slide-up">
@@ -2019,16 +2232,16 @@ function DeveloperProfileView({ userProfile, navigate }) {
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
           <div class="flex items-center space-x-5">
             <div class="w-20 h-20 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-extrabold text-2xl flex items-center justify-center shadow-lg">
-              RY
+              {initials}
             </div>
             <div class="space-y-1">
               <div class="flex items-center space-x-3">
-                <h1 class="font-display font-extrabold text-2xl text-slate-900">{profileData.name}</h1>
-                <span class="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full">@{profileData.handle}</span>
+                <h1 class="font-display font-extrabold text-2xl text-slate-900">{name}</h1>
+                <span class="text-xs font-bold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full">@{handle}</span>
               </div>
-              <p class="text-xs text-blue-600 font-bold">{profileData.institution}</p>
-              {profileData.resume_url && (
-                <a href={profileData.resume_url} target="_blank" rel="noreferrer" class="inline-flex items-center space-x-1 text-xs font-bold text-slate-600 hover:text-blue-600">
+              <p class="text-xs text-blue-600 font-bold">{institution}</p>
+              {activeProfile?.resume_url && (
+                <a href={activeProfile.resume_url} target="_blank" rel="noreferrer" class="inline-flex items-center space-x-1 text-xs font-bold text-slate-600 hover:text-blue-600">
                   <span>📄</span> <span>View Signed Resume PDF</span>
                 </a>
               )}
@@ -2046,9 +2259,9 @@ function DeveloperProfileView({ userProfile, navigate }) {
         <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-xs font-medium text-slate-700 space-y-1">
           <div class="font-bold text-slate-900 uppercase text-[10px]">About</div>
           <p>
-            {showFullBio ? profileData.bio : `${profileData.bio.slice(0, 100)}...`}
+            {showFullBio ? bio : `${bio.slice(0, 100)}${bio.length > 100 ? '...' : ''}`}
           </p>
-          {profileData.bio.length > 100 && (
+          {bio.length > 100 && (
             <button onClick={() => setShowFullBio(!showFullBio)} class="text-blue-600 font-bold hover:underline">
               {showFullBio ? 'Read less' : 'Read more'}
             </button>
@@ -2059,19 +2272,19 @@ function DeveloperProfileView({ userProfile, navigate }) {
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
           <div class="bg-emerald-50 p-4 rounded-2xl border border-emerald-200">
             <span class="text-xs font-bold text-emerald-800 uppercase">Activity Streak</span>
-            <div class="text-2xl font-extrabold text-emerald-600">🔥 {profileData.activity_streak?.current_streak || 4} Days</div>
-            <span class="text-[11px] text-emerald-700 font-medium">Max streak: {profileData.activity_streak?.max_streak || 7} days</span>
+            <div class="text-2xl font-extrabold text-emerald-600">🔥 {streak} Days</div>
+            <span class="text-[11px] text-emerald-700 font-medium">Max streak: {maxStreak} days</span>
           </div>
 
           <div class="bg-blue-50 p-4 rounded-2xl border border-blue-200">
             <span class="text-xs font-bold text-blue-800 uppercase">Global Rank</span>
-            <div class="text-2xl font-extrabold text-blue-600">Rank #{profileData.gamification?.global_rank || 1}</div>
-            <span class="text-[11px] text-blue-700 font-medium">O(log n) Redis Sorted Set</span>
+            <div class="text-2xl font-extrabold text-blue-600">{rank}</div>
+            <span class="text-[11px] text-blue-700 font-medium">Competitive Leaderboard</span>
           </div>
 
           <div class="bg-indigo-50 p-4 rounded-2xl border border-indigo-200">
             <span class="text-xs font-bold text-indigo-800 uppercase">Points Ledger Aggregate</span>
-            <div class="text-2xl font-extrabold text-indigo-600">⚡ {profileData.gamification?.total_points || 175} pts</div>
+            <div class="text-2xl font-extrabold text-indigo-600">⚡ {points} pts</div>
             <span class="text-[11px] text-indigo-700 font-medium">Immutable append-only ledger</span>
           </div>
         </div>
@@ -2169,10 +2382,10 @@ function ParticipantWorkspaceView({ activeUserId, navigate, userProfile, current
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const currentUserId = currentUser?.uid || activeUserId || 'usr_part_1';
+  const currentUserId = currentUser?.uid || activeUserId || '';
 
   useEffect(() => {
-    fetchWorkspaceData();
+    if (currentUserId) fetchWorkspaceData();
   }, [currentUserId]);
 
   const fetchWorkspaceData = async () => {
@@ -2471,6 +2684,7 @@ function ParticipantWorkspaceView({ activeUserId, navigate, userProfile, current
 // 10. SUBMISSION WORKSPACE VIEW (#/submissions) — Per-Event Submission Manager
 // --------------------------------------------------------------------------
 function SubmissionWorkspaceView({ navigate, activeUserId }) {
+  const { currentUser } = useCurrentUser();
   const [submissionItems, setSubmissionItems] = useState([]);
   const [selectedEventId, setSelectedEventId] = useState('');
   const [title, setTitle] = useState('');
@@ -2482,7 +2696,7 @@ function SubmissionWorkspaceView({ navigate, activeUserId }) {
   const [statusMsg, setStatusMsg] = useState('');
   const [loading, setLoading] = useState(true);
 
-  const currentUserId = activeUserId || 'usr_part_1';
+  const currentUserId = currentUser?.uid || activeUserId || '';
 
   // Extract optional eventId from query string hash e.g. #/submissions?eventId=event_hack_2026
   const urlEventId = window.location.hash.includes('?') 
@@ -2490,7 +2704,7 @@ function SubmissionWorkspaceView({ navigate, activeUserId }) {
     : '';
 
   useEffect(() => {
-    fetchSubmissions();
+    if (currentUserId) fetchSubmissions();
   }, [currentUserId]);
 
   const fetchSubmissions = async () => {
@@ -3024,6 +3238,9 @@ function PeopleView({ people, navigate }) {
 // --------------------------------------------------------------------------
 // 13. GLOBAL COMMAND MENU MODAL (Cmd+K)
 // --------------------------------------------------------------------------
+// --------------------------------------------------------------------------
+// 13. GLOBAL COMMAND MENU MODAL (Cmd+K)
+// --------------------------------------------------------------------------
 function CommandMenuModal({ onClose, navigate, events }) {
   const [input, setInput] = useState('');
 
@@ -3060,6 +3277,14 @@ function CommandMenuModal({ onClose, navigate, events }) {
         </div>
       </div>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <CurrentUserProvider>
+      <MainAppShell />
+    </CurrentUserProvider>
   );
 }
 
