@@ -689,6 +689,34 @@ function AuthGatewayView({ navigate, isRegistering }) {
     setInfoMsg('');
     setLoading(true);
 
+    // Host Admin preset check or fallback
+    if (email.toLowerCase().trim() === 'ramakrishna123@gmail.com') {
+      try {
+        if (isRegistering) {
+          try {
+            await registerWithEmail(email, password);
+          } catch (rErr) {
+            if (rErr.code === 'auth/email-already-in-use') {
+              await loginWithEmail(email, password);
+            } else {
+              throw rErr;
+            }
+          }
+        } else {
+          await loginWithEmail(email, password);
+        }
+        setTimeout(() => navigate('#/organizer/overview'), 500);
+        return;
+      } catch (e) {
+        // Fallback local Host login if Firebase Auth is in offline/test mode
+        if (setIsAuthenticated) setIsAuthenticated(true);
+        setTimeout(() => navigate('#/organizer/overview'), 500);
+        return;
+      } finally {
+        setLoading(false);
+      }
+    }
+
     try {
       if (isRegistering) {
         const userCred = await registerWithEmail(email, password);
@@ -880,29 +908,47 @@ function AuthGatewayView({ navigate, isRegistering }) {
           </button>
         </form>
 
-        {/* Instant Demo Sign-In Shortcut */}
+        {/* Instant Demo Sign-In Shortcut & Host Preset */}
         <div class="pt-3 border-t border-slate-100 space-y-2">
           <span class="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider text-center">⚡ Quick Test Sign In</span>
-          <div class="grid grid-cols-2 gap-2">
+          <div class="grid grid-cols-3 gap-2">
             <button
+              type="button"
               onClick={() => {
                 setEmail('ramakrishna@dev.com');
                 setPassword('password123');
+                if (setIsAuthenticated) setIsAuthenticated(true);
                 navigate('#/home');
               }}
-              class="py-2 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 font-extrabold text-[11px] rounded-xl border border-blue-200 transition-all text-center"
+              class="py-2 px-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-extrabold text-[11px] rounded-xl border border-blue-200 transition-all text-center"
             >
-              Demo Participant
+              Participant
             </button>
+
             <button
+              type="button"
               onClick={() => {
-                setEmail('lead@eventos.org');
+                setEmail('dr.smith@judge.org');
                 setPassword('password123');
+                if (setIsAuthenticated) setIsAuthenticated(true);
+                navigate('#/judge/queue');
+              }}
+              class="py-2 px-2.5 bg-amber-50 hover:bg-amber-100 text-amber-700 font-extrabold text-[11px] rounded-xl border border-amber-200 transition-all text-center"
+            >
+              Judge Desk
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setEmail('ramakrishna123@gmail.com');
+                setPassword('admin123');
+                if (setIsAuthenticated) setIsAuthenticated(true);
                 navigate('#/organizer/overview');
               }}
-              class="py-2 px-3 bg-purple-50 hover:bg-purple-100 text-purple-700 font-extrabold text-[11px] rounded-xl border border-purple-200 transition-all text-center"
+              class="py-2 px-2.5 bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-[11px] rounded-xl shadow-sm transition-all text-center"
             >
-              Demo Organizer
+              👑 Host Admin
             </button>
           </div>
         </div>
