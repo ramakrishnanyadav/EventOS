@@ -1,36 +1,37 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', sans-serif;
+  --font-display: 'Outfit', sans-serif;
+}
 
 /* Glassmorphism & Custom Styling System */
 
-@layer utilities {
-  .glass-card {
-    background: rgba(255, 255, 255, 0.85);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(226, 232, 240, 0.8);
-  }
+@utility glass-card {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
 
-  .glass-card-dark {
-    background: rgba(15, 23, 42, 0.9);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(51, 65, 85, 0.8);
-  }
+@utility glass-card-dark {
+  background: rgba(15, 23, 42, 0.9);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(51, 65, 85, 0.8);
+}
 
-  .gradient-text {
-    background: linear-gradient(135deg, #1e40af 0%, #2563eb 50%, #06b6d4 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
+@utility gradient-text {
+  background: linear-gradient(135deg, #1e40af 0%, #2563eb 50%, #06b6d4 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
 
-  .gradient-border {
-    position: relative;
-    border-radius: 1rem;
-    background: linear-gradient(to right, #3b82f6, #06b6d4);
-    padding: 1px;
-  }
+@utility gradient-border {
+  position: relative;
+  border-radius: 1rem;
+  background: linear-gradient(to right, #3b82f6, #06b6d4);
+  padding: 1px;
 }
 
 /* Keyframe Animations */
@@ -94,4 +95,3 @@
 .badge-verified-glow {
   box-shadow: 0 0 12px rgba(16, 185, 129, 0.25);
 }
-
