@@ -3142,15 +3142,136 @@ function JudgeDeskView({ activeUserId, navigate, route, leaderboard, setLeaderbo
 // --------------------------------------------------------------------------
 // 12. ORGANIZER COMMAND CENTER VIEW (#/organizer)
 // --------------------------------------------------------------------------
+// --------------------------------------------------------------------------
+// 12. ORGANIZER COMMAND CENTER VIEW (#/organizer) — Host Insights & CRUD Portal
+// --------------------------------------------------------------------------
 function OrganizerCommandCenterView({ activeUserId, navigate, route, risksData, fetchRisks, auditLog, fetchAuditLog, venues }) {
+  const { currentUser } = useCurrentUser();
   const [activeTab, setActiveTab] = useState('overview');
+  const [stats, setStats] = useState({
+    total_events: 4,
+    total_registrations: 12,
+    total_submissions: 2,
+    checked_in_count: 5,
+    checkin_rate_pct: 78,
+    venue_occupancy_pct: 45,
+    predictive_health_score: 87,
+    live_venues_count: 3
+  });
+
+  // Registrations CRUD State
+  const [registrations, setRegistrations] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [loadingRegs, setLoadingRegs] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingReg, setEditingReg] = useState(null);
+
+  // Add Form State
+  const [newName, setNewName] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newEventId, setNewEventId] = useState('event_hack_2026');
+  const [crudMsg, setCrudMsg] = useState('');
+
+  useEffect(() => {
+    fetchStats();
+    fetchRegistrations();
+  }, []);
+
+  const fetchStats = async () => {
+    try {
+      const res = await fetch('/api/organizer/stats');
+      if (res.ok) {
+        const data = await res.json();
+        setStats(data);
+      }
+    } catch (e) { console.error(e); }
+  };
+
+  const fetchRegistrations = async () => {
+    setLoadingRegs(true);
+    try {
+      const res = await fetch(`/api/organizer/registrations?q=${encodeURIComponent(searchQuery)}&status=${statusFilter}`);
+      if (res.ok) {
+        const data = await res.json();
+        setRegistrations(Array.isArray(data) ? data : []);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingRegs(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRegistrations();
+  }, [searchQuery, statusFilter]);
+
+  const handleCreateRegistration = async (e) => {
+    e.preventDefault();
+    if (!newName || !newEmail) return alert('Name and email are required');
+    setCrudMsg('');
+    try {
+      const res = await fetch('/api/organizer/registrations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName, email: newEmail, eventId: newEventId })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setCrudMsg('✓ Registration created successfully!');
+      setNewName('');
+      setNewEmail('');
+      setShowAddModal(false);
+      fetchRegistrations();
+      fetchStats();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleUpdateRegistration = async (e) => {
+    e.preventDefault();
+    if (!editingReg) return;
+    try {
+      const res = await fetch(`/api/organizer/registrations/${editingReg.registration_id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: editingReg.status,
+          checked_in: editingReg.checked_in,
+          participant_name: editingReg.participant_name
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setShowEditModal(false);
+      setEditingReg(null);
+      fetchRegistrations();
+      fetchStats();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleDeleteRegistration = async (id) => {
+    if (!confirm('Are you sure you want to delete this participant registration?')) return;
+    try {
+      const res = await fetch(`/api/organizer/registrations/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        fetchRegistrations();
+        fetchStats();
+      }
+    } catch (e) { alert(e.message); }
+  };
 
   const handleApprove = async (actionId) => {
     try {
       const res = await fetch('/api/organizer/actions/approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ actionId, actorId: activeUserId }),
+        body: JSON.stringify({ actionId, actorId: activeUserId || 'usr_rk_host' }),
       });
       const data = await res.json();
       alert(data.message);
@@ -3161,54 +3282,217 @@ function OrganizerCommandCenterView({ activeUserId, navigate, route, risksData, 
 
   return (
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-slide-up">
-      <div class="bg-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl space-y-4">
+      {/* Header Bar */}
+      <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl space-y-4">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div class="flex items-center space-x-2">
-              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
-              <span class="text-xs font-bold text-emerald-400">EVENT LIVE • OPERATIONAL</span>
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+              <span class="text-xs font-extrabold text-emerald-400 tracking-wider uppercase">HOST CONTROL CENTER • LIVE</span>
             </div>
             <h1 class="font-display font-extrabold text-2xl sm:text-3xl text-white mt-1">
-              Organizer Live Command Center
+              Host Operations & Registrations Manager
             </h1>
+            <p class="text-xs text-slate-300 font-medium">Logged in as Host Admin: ramakrishna123@gmail.com</p>
           </div>
 
-          <div class="flex items-center space-x-2">
-            {['overview', 'risks', 'actions', 'audit'].map(t => (
+          <div class="flex flex-wrap items-center gap-2">
+            {[
+              { id: 'overview', label: '📊 Insights' },
+              { id: 'registrations', label: '📋 Registrations CRUD' },
+              { id: 'risks', label: '⚠️ Anomaly Radar' },
+              { id: 'actions', label: '⚡ Action Center' },
+              { id: 'audit', label: '📜 Audit Trail' }
+            ].map(t => (
               <button
-                key={t}
-                onClick={() => setActiveTab(t)}
-                class={`px-3.5 py-1.5 rounded-xl text-xs font-bold capitalize transition-all ${activeTab === t ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                key={t.id}
+                onClick={() => setActiveTab(t.id)}
+                class={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all ${activeTab === t.id ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700'}`}
               >
-                {t}
+                {t.label}
               </button>
             ))}
           </div>
         </div>
       </div>
 
+      {/* 1. OVERVIEW & HOST INSIGHTS TAB */}
       {activeTab === 'overview' && (
         <div class="space-y-6">
-          <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-2xs space-y-4">
-            <h2 class="font-display font-bold text-lg text-slate-900">Predictive Event Health Trend</h2>
-            <div class="grid grid-cols-3 gap-4 text-center">
-              <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                <span class="text-xs font-bold text-slate-400 uppercase">Current</span>
-                <div class="text-2xl font-extrabold text-emerald-600">87 / 100</div>
+          {/* Executive Metrics Bar */}
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-2xs space-y-2">
+              <div class="flex items-center justify-between text-slate-500 text-xs font-bold uppercase">
+                <span>Total Registrations</span>
+                <span class="text-lg">🎟️</span>
               </div>
-              <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                <span class="text-xs font-bold text-slate-400 uppercase">+30 Min Trend</span>
-                <div class="text-2xl font-extrabold text-amber-600">79 / 100</div>
+              <div class="text-3xl font-extrabold text-slate-900">{stats.total_registrations}</div>
+              <div class="text-[11px] font-semibold text-emerald-600">Across {stats.total_events} Active Events</div>
+            </div>
+
+            <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-2xs space-y-2">
+              <div class="flex items-center justify-between text-slate-500 text-xs font-bold uppercase">
+                <span>Venue Check-In Rate</span>
+                <span class="text-lg">✅</span>
               </div>
-              <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                <span class="text-xs font-bold text-slate-400 uppercase">+60 Min Trend</span>
-                <div class="text-2xl font-extrabold text-rose-600">71 / 100</div>
+              <div class="text-3xl font-extrabold text-blue-600">{stats.checkin_rate_pct}%</div>
+              <div class="text-[11px] font-semibold text-slate-500">{stats.checked_in_count} Checked-In Attendees</div>
+            </div>
+
+            <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-2xs space-y-2">
+              <div class="flex items-center justify-between text-slate-500 text-xs font-bold uppercase">
+                <span>Project Submissions</span>
+                <span class="text-lg">🚀</span>
               </div>
+              <div class="text-3xl font-extrabold text-indigo-600">{stats.total_submissions}</div>
+              <div class="text-[11px] font-semibold text-indigo-600">Active Final Submissions</div>
+            </div>
+
+            <div class="bg-white p-5 rounded-3xl border border-slate-200 shadow-2xs space-y-2">
+              <div class="flex items-center justify-between text-slate-500 text-xs font-bold uppercase">
+                <span>Predictive Health</span>
+                <span class="text-lg">📈</span>
+              </div>
+              <div class="text-3xl font-extrabold text-emerald-600">{stats.predictive_health_score} <span class="text-xs font-normal text-slate-400">/100</span></div>
+              <div class="text-[11px] font-semibold text-emerald-600">Normal Capacity Balance</div>
+            </div>
+          </div>
+
+          {/* Quick Host Navigation Cards */}
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-2xs space-y-3">
+              <h3 class="font-display font-bold text-lg text-slate-900">Manage Registrations & CRUD</h3>
+              <p class="text-xs text-slate-500">View live participant table, search by email/name, add new attendees manually, edit status, or revoke access.</p>
+              <button onClick={() => setActiveTab('registrations')} class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs">
+                Open Registrations Portal ➔
+              </button>
+            </div>
+
+            <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-2xs space-y-3">
+              <h3 class="font-display font-bold text-lg text-slate-900">Door Scanner & Check-In</h3>
+              <p class="text-xs text-slate-500">Scan participant rotating QR badges at venue entry using device camera or manual JSON payload verification.</p>
+              <button onClick={() => navigate('#/organizer/scanner')} class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl shadow-xs">
+                Open QR Door Scanner ➔
+              </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* 2. REGISTRATIONS CRUD TAB */}
+      {activeTab === 'registrations' && (
+        <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-2xs space-y-6 animate-slide-up">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+            <div>
+              <h2 class="font-display font-extrabold text-xl text-slate-900">Registrations Management & CRUD</h2>
+              <p class="text-xs text-slate-500">Full control to create, inspect, update status, and remove attendee registrations.</p>
+            </div>
+
+            <button
+              onClick={() => setShowAddModal(true)}
+              class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center space-x-1"
+            >
+              <span>+ Add New Registration</span>
+            </button>
+          </div>
+
+          {/* Search & Filter Toolbar */}
+          <div class="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+            <div class="w-full sm:w-80">
+              <input
+                type="text"
+                placeholder="Search by participant name, email, event..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                class="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-800"
+              />
+            </div>
+
+            <div class="flex items-center space-x-2 w-full sm:w-auto">
+              <span class="text-xs font-bold text-slate-500">Filter Status:</span>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                class="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-700"
+              >
+                <option value="ALL">All Statuses</option>
+                <option value="CONFIRMED">CONFIRMED</option>
+                <option value="CHECKED_IN">CHECKED_IN</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Registrations Data Table */}
+          {loadingRegs ? (
+            <div class="p-8 text-center text-xs font-medium text-slate-400">Loading registrations dataset...</div>
+          ) : registrations.length === 0 ? (
+            <div class="p-8 text-center text-xs font-medium text-slate-500 bg-slate-50 rounded-2xl">
+              No matching registrations found. Click "+ Add New Registration" above to add an attendee!
+            </div>
+          ) : (
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr class="border-b border-slate-200 bg-slate-50 text-slate-500 font-extrabold uppercase tracking-wider">
+                    <th class="p-3">Participant</th>
+                    <th class="p-3">Event / Opportunity</th>
+                    <th class="p-3">Status</th>
+                    <th class="p-3">Check-In</th>
+                    <th class="p-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 font-medium">
+                  {registrations.map(r => (
+                    <tr key={r.registration_id} class="hover:bg-slate-50/80 transition-colors">
+                      <td class="p-3">
+                        <strong class="text-slate-900 block font-bold">{r.participant_name}</strong>
+                        <span class="text-slate-500">{r.participant_email}</span>
+                      </td>
+                      <td class="p-3">
+                        <span class="font-bold text-slate-800 block">{r.event_name}</span>
+                        <span class="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-600 rounded">{r.kind}</span>
+                      </td>
+                      <td class="p-3">
+                        <span class={`px-2.5 py-1 text-[10px] font-extrabold rounded-full ${
+                          r.status === 'CHECKED_IN' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-blue-100 text-blue-800'
+                        }`}>
+                          {r.status}
+                        </span>
+                      </td>
+                      <td class="p-3">
+                        {r.checked_in ? (
+                          <span class="text-emerald-700 font-bold">✓ Checked In</span>
+                        ) : (
+                          <span class="text-slate-400 font-medium">Not Checked In</span>
+                        )}
+                      </td>
+                      <td class="p-3 text-right space-x-2">
+                        <button
+                          onClick={() => {
+                            setEditingReg(r);
+                            setShowEditModal(true);
+                          }}
+                          class="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-lg border border-blue-200"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteRegistration(r.registration_id)}
+                          class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-lg border border-rose-200"
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 3. RISKS TAB */}
       {activeTab === 'risks' && (
         <div class="glass-card rounded-3xl p-6 border border-slate-200 shadow-glass space-y-4">
           <h2 class="font-display font-bold text-lg text-slate-900">Operational Anomaly Radar</h2>
@@ -3226,6 +3510,7 @@ function OrganizerCommandCenterView({ activeUserId, navigate, route, risksData, 
         </div>
       )}
 
+      {/* 4. ACTIONS TAB */}
       {activeTab === 'actions' && (
         <div class="glass-card rounded-3xl p-6 border border-slate-200 shadow-glass space-y-4">
           <h2 class="font-display font-bold text-lg text-slate-900">Event Action Center</h2>
@@ -3250,6 +3535,7 @@ function OrganizerCommandCenterView({ activeUserId, navigate, route, risksData, 
         </div>
       )}
 
+      {/* 5. AUDIT TAB */}
       {activeTab === 'audit' && (
         <div class="glass-card rounded-3xl p-6 border border-slate-200 shadow-glass space-y-4">
           <h2 class="font-display font-bold text-lg text-slate-900">Immutable Audit Center Stream</h2>
@@ -3263,6 +3549,123 @@ function OrganizerCommandCenterView({ activeUserId, navigate, route, risksData, 
                 <span class="text-slate-400 font-mono text-[11px]">{new Date(a.created_at).toLocaleTimeString()}</span>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* CREATE REGISTRATION MODAL */}
+      {showAddModal && (
+        <div class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div class="bg-white rounded-3xl max-w-md w-full p-6 border border-slate-200 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+              <h3 class="font-display font-extrabold text-base text-slate-900">Add New Participant Registration</h3>
+              <button onClick={() => setShowAddModal(false)} class="text-xs font-bold text-slate-400 hover:text-slate-700">✕</button>
+            </div>
+
+            <form onSubmit={handleCreateRegistration} class="space-y-3 text-xs font-semibold">
+              <div>
+                <label class="block text-slate-700 mb-1">Participant Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Alex Rivera"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5"
+                />
+              </div>
+
+              <div>
+                <label class="block text-slate-700 mb-1">Participant Email</label>
+                <input
+                  type="email"
+                  required
+                  placeholder="alex@domain.com"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5"
+                />
+              </div>
+
+              <div>
+                <label class="block text-slate-700 mb-1">Select Event</label>
+                <select
+                  value={newEventId}
+                  onChange={(e) => setNewEventId(e.target.value)}
+                  class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-bold"
+                >
+                  <option value="event_hack_2026">EVENTOS Global Hackathon 2026</option>
+                  <option value="event_msft_ai">Microsoft AI Agents Challenge</option>
+                  <option value="event_github_dev">GitHub Open Source Summit 2026</option>
+                  <option value="event_adobe_design">Adobe UX Innovation Jam</option>
+                </select>
+              </div>
+
+              <div class="pt-3 flex space-x-2">
+                <button type="submit" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl shadow-sm">
+                  Create Registration ✓
+                </button>
+                <button type="button" onClick={() => setShowAddModal(false)} class="px-4 py-2.5 bg-slate-100 text-slate-600 font-bold rounded-xl">
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT REGISTRATION MODAL */}
+      {showEditModal && editingReg && (
+        <div class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div class="bg-white rounded-3xl max-w-md w-full p-6 border border-slate-200 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+              <h3 class="font-display font-extrabold text-base text-slate-900">Edit Participant Registration</h3>
+              <button onClick={() => setShowEditModal(false)} class="text-xs font-bold text-slate-400 hover:text-slate-700">✕</button>
+            </div>
+
+            <form onSubmit={handleUpdateRegistration} class="space-y-3 text-xs font-semibold">
+              <div>
+                <label class="block text-slate-700 mb-1">Participant Name</label>
+                <input
+                  type="text"
+                  value={editingReg.participant_name}
+                  onChange={(e) => setEditingReg({ ...editingReg, participant_name: e.target.value })}
+                  class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5"
+                />
+              </div>
+
+              <div>
+                <label class="block text-slate-700 mb-1">Registration Status</label>
+                <select
+                  value={editingReg.status}
+                  onChange={(e) => setEditingReg({ ...editingReg, status: e.target.value })}
+                  class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-bold"
+                >
+                  <option value="CONFIRMED">CONFIRMED</option>
+                  <option value="CHECKED_IN">CHECKED_IN</option>
+                  <option value="PENDING">PENDING</option>
+                </select>
+              </div>
+
+              <div class="flex items-center space-x-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="chk_in"
+                  checked={Boolean(editingReg.checked_in)}
+                  onChange={(e) => setEditingReg({ ...editingReg, checked_in: e.target.checked ? 1 : 0 })}
+                />
+                <label htmlFor="chk_in" class="text-xs font-bold text-slate-800">Mark Checked-In at Venue</label>
+              </div>
+
+              <div class="pt-3 flex space-x-2">
+                <button type="submit" class="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold rounded-xl shadow-sm">
+                  Save Changes ✓
+                </button>
+                <button type="button" onClick={() => setShowEditModal(false)} class="px-4 py-2.5 bg-slate-100 text-slate-600 font-bold rounded-xl">
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
