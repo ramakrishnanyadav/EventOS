@@ -1,0 +1,49 @@
+{
+  "name": "eventos-copilot",
+  "version": "3.0.0",
+  "description": "EVENTOS Copilot — Context-aware event operations assistant built on the EVENTOS platform",
+  "main": "apps/api/server.ts",
+  "type": "module",
+  "scripts": {
+    "start": "tsx apps/api/server.ts",
+    "dev": "tsx watch apps/api/server.ts",
+    "build": "vite build apps/web",
+    "preview": "vite preview apps/web",
+    "test": "tsx --test tests/**/*.test.ts"
+  },
+  "keywords": [
+    "eventos",
+    "copilot",
+    "event-management",
+    "hackathon",
+    "decision-engine",
+    "context-engine"
+  ],
+  "author": "EVENTOS Core Engineering Team",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^4.19.2",
+    "express-rate-limit": "^8.7.0",
+    "firebase": "^12.18.0",
+    "firebase-admin": "^14.3.0",
+    "helmet": "^8.3.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "ws": "^8.17.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^4.17.25",
+    "@types/node": "^20.12.12",
+    "@types/ws": "^8.5.10",
+    "@vitejs/plugin-react": "^6.1.1",
+    "autoprefixer": "^10.5.4",
+    "postcss": "^8.5.26",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.11.0",
+    "typescript": "^5.4.5",
+    "vite": "^8.2.2"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022", "DOM"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@modules/*": ["modules/*"],
+      "@intelligence/*": ["intelligence/*"],
+      "@realtime/*": ["realtime/*"]
+    }
+  },
+  "include": [
+    "apps/**/*",
+    "modules/**/*",
+    "intelligence/**/*",
+    "realtime/**/*",
+    "tests/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}

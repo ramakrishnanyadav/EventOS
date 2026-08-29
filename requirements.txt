@@ -1,0 +1,16 @@
+# EVENTOS Copilot — Optional Python Auxiliary Dependencies & Tooling
+# Core Runtime: Node.js (v20+ / v22+) & TypeScript
+
+# HTTP & REST Client Utilities
+requests>=2.31.0
+urllib3>=2.2.0
+
+# Asymmetric Cryptography & Token Verification
+cryptography>=42.0.0
+
+# Data Analysis & Verification Tools
+pytest>=8.0.0
+numpy>=1.26.0
+
+# Realtime WebSocket Clients
+websocket-client>=1.7.0
